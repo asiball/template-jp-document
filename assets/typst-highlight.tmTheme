@@ -13,7 +13,7 @@
 
   参照方法: template/spec.typ の spec-doc 内で
   `set raw(theme: "/assets/typst-highlight.tmTheme")` として読み込む
-  (`--root .` 前提のルート相対パス)。
+  (typst compile のルート相対パスとして解決される前提)。
 -->
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">

@@ -16,6 +16,8 @@ NAME       := $(basename $(notdir $(SRC)))
 BUILD      := build
 TEMPLATE   := template/template.typ
 FONT_DIR   := assets/fonts
+FONTS      := $(wildcard $(FONT_DIR)/*.otf)
+HIGHLIGHT_THEME := assets/typst-highlight.tmTheme
 
 # ローカル `make pdf` の検証環境で実測したバージョン(README 参照)。
 # `make pdf-docker` はこれらを Dockerfile 内で固定しているため常に一致する。
@@ -34,14 +36,23 @@ DOCKER_FULLTAG := $(DOCKER_IMAGE):$(DOCKER_TAG)
 TYPST_SHA256     ?=
 ALLOW_UNVERIFIED ?=
 
-.PHONY: pdf pdf-docker docker-build clean lint check-versions
+.PHONY: pdf pdf-docker docker-build clean lint lint-src check-versions
 
-pdf: check-versions lint $(BUILD)/$(NAME).pdf
+pdf: check-versions lint-src $(BUILD)/$(NAME).pdf
 
 # 実際の pandoc / typst のバージョンを表示し、期待バージョンと異なる場合は
 # 警告を出す(ビルド自体は継続する)。POSIX sh で動作するように書く。
 # シムの typst には --version が無い場合があるため、失敗しても継続する。
+#
+# 冒頭で SRC にスペースが含まれていないかを確認する。Make はスペースを
+# 含むパスを引数として安全に扱えない(単語分割される)ため、完全対応は
+# せずに明確なエラーで停止する(README/CLAUDE.md 参照)。
 check-versions:
+	@case "$(SRC)" in \
+		*" "*) \
+			echo "ERROR: SRC のパスにスペースは使えません: $(SRC)" >&2; \
+			exit 1 ;; \
+	esac
 	@pandoc_line="$$(pandoc --version 2>/dev/null | head -n1)"; \
 	echo "pandoc: $${pandoc_line:-(バージョン取得に失敗しました)}"; \
 	pandoc_ver="$$(printf '%s' "$$pandoc_line" | awk '{print $$2}')"; \
@@ -60,26 +71,31 @@ check-versions:
 	fi
 
 # 簡易 lint(scripts/lint.sh)。見出しの手動採番などを検知する。
+# `make lint` 単体は従来どおり docs/*.md 全件を対象にする。
 lint:
 	@sh scripts/lint.sh
 
+# `make pdf` の内部で走る lint は、ビルド対象の SRC のみを対象にする。
+lint-src:
+	@sh scripts/lint.sh "$(SRC)"
+
 $(BUILD)/$(NAME).typ: $(SRC) $(TEMPLATE) template/spec.typ
-	@mkdir -p $(BUILD)
+	@mkdir -p "$(BUILD)"
 	pandoc \
 		--from markdown \
 		--to typst \
 		--standalone \
-		--template $(TEMPLATE) \
-		-o $@ \
-		$(SRC)
+		--template "$(TEMPLATE)" \
+		-o "$@" \
+		"$(SRC)"
 
-$(BUILD)/$(NAME).pdf: $(BUILD)/$(NAME).typ
+$(BUILD)/$(NAME).pdf: $(BUILD)/$(NAME).typ $(FONTS) $(HIGHLIGHT_THEME)
 	typst compile \
 		--root . \
-		--font-path $(FONT_DIR) \
+		--font-path "$(FONT_DIR)" \
 		--ignore-system-fonts \
-		$(BUILD)/$(NAME).typ \
-		$(BUILD)/$(NAME).pdf
+		"$(BUILD)/$(NAME).typ" \
+		"$(BUILD)/$(NAME).pdf"
 
 docker-build:
 	docker build \
@@ -88,12 +104,17 @@ docker-build:
 		-t $(DOCKER_FULLTAG) -t $(DOCKER_IMAGE):latest .
 
 pdf-docker: docker-build
-	@mkdir -p $(BUILD)
-	docker run --rm --user $$(id -u):$$(id -g) -v $(CURDIR):/work -w /work $(DOCKER_FULLTAG) \
+	@case "$(SRC)" in \
+		*" "*) \
+			echo "ERROR: SRC のパスにスペースは使えません: $(SRC)" >&2; \
+			exit 1 ;; \
+	esac
+	@mkdir -p "$(BUILD)"
+	docker run --rm --user $$(id -u):$$(id -g) -v "$(CURDIR)":/work -w /work $(DOCKER_FULLTAG) \
 		sh -c '\
-			mkdir -p $(BUILD) && \
-			pandoc --from markdown --to typst --standalone --template $(TEMPLATE) -o $(BUILD)/$(NAME).typ $(SRC) && \
-			typst compile --root . --font-path $(FONT_DIR) --ignore-system-fonts $(BUILD)/$(NAME).typ $(BUILD)/$(NAME).pdf \
+			mkdir -p "$(BUILD)" && \
+			pandoc --from markdown --to typst --standalone --template "$(TEMPLATE)" -o "$(BUILD)/$(NAME).typ" "$(SRC)" && \
+			typst compile --root . --font-path "$(FONT_DIR)" --ignore-system-fonts "$(BUILD)/$(NAME).typ" "$(BUILD)/$(NAME).pdf" \
 		'
 
 clean:

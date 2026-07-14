@@ -19,6 +19,8 @@ make clean                    # build/ を削除
 
 pandoc / typst が PATH にない場合は `make pdf-docker` を使う(Docker イメージ内でビルド)。
 
+`SRC` のパスにスペースは使えない(Make の引数分割の制約のため)。スペースを含むパスを指定すると `make pdf` / `make pdf-docker` は明確なエラーメッセージで停止する。
+
 ## 執筆 → ビルド → 確認 → 修正のループ
 
 1. `docs/*.md` を編集する(構造のみ。スタイル記述は禁止。詳細は README の「執筆ルール」参照)。

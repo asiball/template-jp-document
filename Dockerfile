@@ -25,6 +25,11 @@ FROM ${PANDOC_IMAGE}
 # 合わせて 0.13.1 に固定している。ローカル検証との挙動差異を避けるため、
 # Typst のバージョンを変更する場合は README の手順に従って再検証すること。
 ARG TYPST_VERSION=0.13.1
+# Typst の GitHub Releases アセット名に含まれるターゲットトリプル。既定は
+# x86_64(Linux, musl 静的ビルド)。Apple Silicon 等の別アーキテクチャ向けに
+# ビルドする場合は `--build-arg TYPST_ARCH=aarch64-unknown-linux-musl` の
+# ように指定する(README の Docker 節を参照)。
+ARG TYPST_ARCH=x86_64-unknown-linux-musl
 # 空文字のままではチェックサム検証を行えない(このセッションのネットワーク
 # 制約により GitHub Releases のアセットへ直接アクセスできず、実際の sha256 を
 # 取得できなかったため)。本番運用では README の手順で実値を取得し、
@@ -40,7 +45,7 @@ USER root
 
 RUN set -eu; \
 	apk add --no-cache curl xz ca-certificates; \
-	arch_url="https://github.com/typst/typst/releases/download/v${TYPST_VERSION}/typst-x86_64-unknown-linux-musl.tar.xz"; \
+	arch_url="https://github.com/typst/typst/releases/download/v${TYPST_VERSION}/typst-${TYPST_ARCH}.tar.xz"; \
 	curl -fsSL -o /tmp/typst.tar.xz "$arch_url"; \
 	if [ -n "$TYPST_SHA256" ]; then \
 		echo "${TYPST_SHA256}  /tmp/typst.tar.xz" | sha256sum -c -; \
@@ -55,7 +60,7 @@ RUN set -eu; \
 	fi; \
 	mkdir -p /tmp/typst-extract; \
 	tar -xJf /tmp/typst.tar.xz -C /tmp/typst-extract; \
-	install -m 0755 "/tmp/typst-extract/typst-x86_64-unknown-linux-musl/typst" /usr/local/bin/typst; \
+	install -m 0755 "/tmp/typst-extract/typst-${TYPST_ARCH}/typst" /usr/local/bin/typst; \
 	rm -rf /tmp/typst.tar.xz /tmp/typst-extract; \
 	apk del curl xz
 

@@ -25,6 +25,15 @@
 // マッチするファミリー名(Typst は "R"/"B" を weight として自動分離しない)。
 #let font-code = "Source Han Code JP R" // コード(等幅)
 
+// ---- レイアウト用のマジックナンバー(命名定数) --------------------------
+// 表紙タイトルの折り返しヒューリスティック(cover-page で使用)。
+#let title-shrink-threshold = 16 // この文字数を超えたら小さいサイズにする
+#let title-size-large = 26pt // 閾値以下(短いタイトル)のフォントサイズ
+#let title-size-small = 22pt // 閾値超(長いタイトル)のフォントサイズ
+
+// 小書きかな直後の字送り補正量(spec-doc の strong ショウルールで使用)。
+#let small-kana-correction = -0.12em
+
 // =============================================================================
 // 内部ユーティリティ
 // =============================================================================
@@ -78,7 +87,7 @@
   // タイトル文字数に応じたフォントサイズ(長いタイトルの折り返しで
   // 1 文字だけが孤立する「泣き別れ」を軽減するヒューリスティック)
   let title-len = if title != none { content-to-string(title).clusters().len() } else { 0 }
-  let title-size = if title-len > 16 { 22pt } else { 26pt }
+  let title-size = if title-len > title-shrink-threshold { title-size-small } else { title-size-large }
 
   // タイトルブロック(中央。ページのやや上(光学中心)に来るよう、
   // 前後の v(1fr) / v(1.4fr) で余白配分を調整している)
@@ -201,7 +210,7 @@
 ) = {
   // ---- 文書メタデータ(date は決定的ビルドのため常に none) ----
   set document(
-    title: if title != none { title } else { auto },
+    title: if title != none { title } else { none },
     author: if author != none { (content-to-string(author),) } else { () },
   )
 
@@ -242,7 +251,7 @@
     let styled = text(weight: "bold", it.body)
     let s = content-to-string(it.body)
     if s.len() > 0 and small-kana-tail.contains(s.last()) {
-      box[#styled#h(-0.12em)]
+      box[#styled#h(small-kana-correction)]
     } else {
       styled
     }
