@@ -239,13 +239,15 @@
   // ---- コードブロック(等幅フォント) ----
   show raw: set text(font: font-code)
 
+  // 短いコードブロックはページ境界で分割せず丸ごと次ページへ送る
+  // (ページ末尾に上枠だけの空断片が残るのを防ぐ)。長いものだけ分割を許可する。
   show raw.where(block: true): it => block(
     width: 100%,
     fill: code-bg,
     stroke: 0.6pt + code-border,
     radius: 2pt,
     inset: 8pt,
-    breakable: true,
+    breakable: it.text.split("\n").len() > 20,
   )[
     #set text(size: 8.5pt)
     #set par(justify: false, leading: 0.72em)
