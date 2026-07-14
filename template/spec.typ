@@ -78,10 +78,14 @@
   organization: none,
   logo: none,
 ) = {
-  set page(numbering: none, header: none, footer: none)
+  // 上部: ページ物理上端に全幅で貼り付くブリード帯(余白の外、紙面の最上端)。
+  set page(
+    numbering: none,
+    header: none,
+    footer: none,
+    background: place(top, rect(width: 100%, height: 8mm, fill: accent-color, inset: 0pt, outset: 0pt)),
+  )
 
-  // 上部: ページ上端(余白内の先頭)に配置する全幅のソリッドバー
-  rect(width: 100%, height: 4mm, fill: accent-color, inset: 0pt, outset: 0pt)
   v(1fr)
 
   // タイトル文字数に応じたフォントサイズ(長いタイトルの折り返しで
@@ -112,7 +116,6 @@
         #subtitle
       ]
     }
-    #line(length: 26mm, stroke: 1.5pt + accent-color)
   ]
 
   v(1.4fr)
@@ -129,10 +132,8 @@
       #thin-rule(weight: 0.8pt)
       #v(0.9em)
       #set text(font: font-sans, size: 10pt)
-      #table(
+      #grid(
         columns: (1fr, 1fr),
-        stroke: none,
-        fill: none,
         inset: (x: 4pt, y: 5pt),
         align: (left, left),
         ..info-rows.flatten()
@@ -156,7 +157,7 @@
     table(
       columns: (10%, 18%, 22%, 50%),
       stroke: none,
-      inset: (x: 8pt, y: 6pt),
+      inset: (x: 8pt, y: 7pt),
       align: (center + horizon, center + horizon, center + horizon, left + horizon),
       table.header([版数], [日付], [作成者], [改訂内容]),
       table.hline(),
@@ -272,6 +273,14 @@
   set list(marker: ([•], [–]), indent: 0.3em, spacing: 0.65em)
   set enum(indent: 0.3em, spacing: 0.65em)
 
+  // ---- 定義リスト(Markdown の "Term\n: Description" 記法) ----
+  // Pandoc の既定 Typst テンプレートに由来する装飾(太字の用語 +
+  // インデントされた説明)。見た目の一元化のため template.typ から移設。
+  show terms.item: it => block(breakable: false)[
+    #text(weight: "bold")[#it.term]
+    #block(inset: (left: 1.5em, top: -0.4em))[#it.description]
+  ]
+
   // ---- コードブロック(等幅フォント・低彩度シンタックスハイライト) ----
   // 既定のハイライト配色は彩度が高く紙面の青系規律から浮くため、
   // assets/typst-highlight.tmTheme(低彩度パレット)に差し替える。
@@ -295,8 +304,12 @@
     #it
   ]
 
+  // インラインコードは、引用ブロック(fill: luma(250))など背景色を持つ
+  // 領域の上に置かれても輪郭で判別できるよう、極細のボーダーを付ける
+  // (code-bg 自体との明度差だけに頼らない)。
   show raw.where(block: false): box.with(
     fill: code-bg,
+    stroke: 0.4pt + luma(225),
     outset: (y: 2.5pt),
     inset: (x: 3pt),
     radius: 2pt,
@@ -308,7 +321,7 @@
   // 位置関数で与える方式を用いている(bold は show/set text で問題なく反映される)。
   set table(
     stroke: none,
-    inset: (x: 8pt, y: 6pt),
+    inset: (x: 8pt, y: 7pt),
     fill: (x, y) => if y == 0 { table-header-bg } else { none },
   )
   show table.cell.where(y: 0): set text(font: font-sans, weight: "bold")
@@ -364,11 +377,14 @@
     #it
   ]
 
-  // H4 以降: 番号なしの小見出し。
-  show heading.where(level: 4): it => block(above: 1.1em, below: 0.5em)[
+  // H4 以降: 番号なしの小見出し(レベル 4/5/6 すべて同じ見た目)。
+  let unnumbered-subheading(it) = block(above: 1.1em, below: 0.5em)[
     #set text(font: font-sans, size: 10pt, weight: "bold", style: "normal")
     #it.body
   ]
+  show heading.where(level: 4): unnumbered-subheading
+  show heading.where(level: 5): unnumbered-subheading
+  show heading.where(level: 6): unnumbered-subheading
 
   // ---- 目次の見出し文字 ----
   // 章(level 1)は太字ゴシックにして視覚的な階層を強調する。節・項は

@@ -11,11 +11,14 @@ make lint                     # docs/*.md の簡易 lint のみを実行
 make clean                    # build/ を削除
 ```
 
-`make pdf` は次の順で実行されます。
+`make pdf` は次の順で実行されます(`Makefile` の実行順)。
 
-1. `make lint`(`scripts/lint.sh`)で `docs/*.md` を簡易チェックする。見出しの手動採番(`# 1. foo` 等)を検出したらエラーで停止する。生 Typst(` ```{=typst} `)ブロック内に装飾コード(`set text(` 等)が見つかった場合は警告を表示するが、ビルドは継続する。
-2. `pandoc --from markdown --to typst --standalone --template template/template.typ -o build/<name>.typ <SRC>`
-3. `typst compile --root . --font-path assets/fonts --ignore-system-fonts build/<name>.typ build/<name>.pdf`
+1. 実際の pandoc / typst のバージョンを表示し、期待バージョン(README 参照)と異なる場合は警告を表示する(ビルドは継続する)。
+2. `scripts/lint.sh` でビルド対象の Markdown を簡易チェックする(`make lint` は `docs/*.md` 全件が対象)。
+   - **エラー(ビルド停止)**: 見出しの手動採番(`# 1. foo` / `## 2) foo` のような「番号+ドット/括弧+空白」、`# 第1章 foo` / `# 1章 foo` のような「(第)N章/節/項」)、YAML フロントマターの `title:` 欠落・空。
+   - **警告(ビルド継続)**: 見出しが数字で始まる(`## 2.5 系` 等。上記エラーパターンに一致しない、手動採番の疑いがあるだけのケース)、生 Typst(` ```{=typst} `)ブロック内の装飾コード(`set text(` 等)。
+3. `pandoc --from markdown --to typst --standalone --template template/template.typ -o build/<name>.typ <SRC>`
+4. `typst compile --root . --font-path assets/fonts --ignore-system-fonts build/<name>.typ build/<name>.pdf`
 
 pandoc / typst が PATH にない場合は `make pdf-docker` を使う(Docker イメージ内でビルド)。
 

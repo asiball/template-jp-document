@@ -38,7 +38,7 @@ ALLOW_UNVERIFIED ?=
 
 .PHONY: pdf pdf-docker docker-build clean lint lint-src check-versions
 
-pdf: check-versions lint-src $(BUILD)/$(NAME).pdf
+pdf: check-versions $(BUILD)/$(NAME).pdf
 
 # 実際の pandoc / typst のバージョンを表示し、期待バージョンと異なる場合は
 # 警告を出す(ビルド自体は継続する)。POSIX sh で動作するように書く。
@@ -75,12 +75,17 @@ check-versions:
 lint:
 	@sh scripts/lint.sh
 
-# `make pdf` の内部で走る lint は、ビルド対象の SRC のみを対象にする。
+# ビルド対象の SRC のみを対象に lint だけを単体実行したい場合に使う補助
+# ターゲット(SRC のみ対象。`make pdf` 自体は $(BUILD)/$(NAME).typ のレシピ
+# 先頭で `sh scripts/lint.sh "$(SRC)" &&` を実行するため、これを prerequisite
+# にはしていない。prerequisite にすると `make -j` 時に pandoc と lint が
+# 並行実行され、lint 失敗時にも .typ が生成されてしまう問題があった)。
 lint-src:
 	@sh scripts/lint.sh "$(SRC)"
 
 $(BUILD)/$(NAME).typ: $(SRC) $(TEMPLATE) template/spec.typ
 	@mkdir -p "$(BUILD)"
+	sh scripts/lint.sh "$(SRC)" && \
 	pandoc \
 		--from markdown \
 		--to typst \
@@ -113,6 +118,7 @@ pdf-docker: docker-build
 	docker run --rm --user $$(id -u):$$(id -g) -v "$(CURDIR)":/work -w /work $(DOCKER_FULLTAG) \
 		sh -c '\
 			mkdir -p "$(BUILD)" && \
+			sh scripts/lint.sh "$(SRC)" && \
 			pandoc --from markdown --to typst --standalone --template "$(TEMPLATE)" -o "$(BUILD)/$(NAME).typ" "$(SRC)" && \
 			typst compile --root . --font-path "$(FONT_DIR)" --ignore-system-fonts "$(BUILD)/$(NAME).typ" "$(BUILD)/$(NAME).pdf" \
 		'

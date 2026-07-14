@@ -13,11 +13,6 @@
 
 #let horizontalrule = line(start: (25%, 0%), end: (75%, 0%))
 
-#show terms.item: it => block(breakable: false)[
-  #text(weight: "bold")[#it.term]
-  #block(inset: (left: 1.5em, top: -0.4em))[#it.description]
-]
-
 $if(highlighting-definitions)$
 // syntax highlighting functions from skylighting:
 $highlighting-definitions$
