@@ -260,12 +260,19 @@
   )
 
   // ---- 表 ----
+  // 注意: show table.cell.where(y:0): set table.cell(fill: ...) は
+  // このバージョンの Typst では反映されないため、table 自体の fill を
+  // 位置関数で与える方式を用いている(bold は show/set text で問題なく反映される)。
   set table(
     stroke: none,
     inset: (x: 8pt, y: 6pt),
+    fill: (x, y) => if y == 0 { table-header-bg } else { none },
   )
-  show table.cell.where(y: 0): set table.cell(fill: table-header-bg)
   show table.cell.where(y: 0): set text(font: font-sans, weight: "bold")
+  // Pandoc は表を align(center)[#table(align: (auto, ...))] として出力するため、
+  // 何もしないと本文セルが外側の中央揃えを継承してしまう。既定は左揃え+垂直中央とし、
+  // Markdown 側で明示された列揃え(:---: 等)は table の align 引数が優先されるため保持される。
+  show table.cell: set align(start + horizon)
   show table: set text(size: 9pt)
   show table: it => block(
     stroke: (top: 1.1pt + accent-color, bottom: 1.1pt + accent-color),
