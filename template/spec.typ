@@ -67,6 +67,7 @@
   date: none,
   author: none,
   organization: none,
+  logo: none,
 ) = {
   set page(numbering: none, header: none, footer: none)
 
@@ -75,8 +76,16 @@
   accent-rule(weight: 1.4pt)
   v(1fr)
 
+  // タイトル文字数に応じたフォントサイズ(長いタイトルの折り返しで
+  // 1 文字だけが孤立する「泣き別れ」を軽減するヒューリスティック)
+  let title-len = if title != none { content-to-string(title).clusters().len() } else { 0 }
+  let title-size = if title-len > 16 { 22pt } else { 26pt }
+
   // タイトルブロック(中央)
   align(center)[
+    #if logo != none {
+      block(below: 1.2em)[#logo]
+    }
     #if organization != none {
       block(below: 2em)[
         #set text(font: font-sans, size: 11pt, fill: accent-soft, weight: "medium")
@@ -84,7 +93,8 @@
       ]
     }
     #block(below: if subtitle == none { 0em } else { 0.9em })[
-      #set text(font: font-sans, size: 26pt, weight: "bold")
+      #set par(justify: false, linebreaks: "optimized", leading: 0.45em)
+      #set text(font: font-sans, size: title-size, weight: "bold")
       #title
     ]
     #if subtitle != none {
@@ -112,6 +122,7 @@
       #table(
         columns: (1fr, 1fr),
         stroke: none,
+        fill: none,
         inset: (x: 4pt, y: 5pt),
         align: (left, left),
         ..info-rows.flatten()
@@ -183,6 +194,7 @@
   date: none,
   author: none,
   organization: none,
+  logo: none,
   revisions: (),
   body,
 ) = {
@@ -330,9 +342,17 @@
   ]
 
   // ---- 目次の見出し文字 ----
+  // 章(level 1)は太字ゴシックにして視覚的な階層を強調する。節・項は
+  // 現状のまま(フォントのみゴシックに揃える)。
   show outline.entry: it => {
     set text(font: font-sans)
-    it
+    if it.level == 1 {
+      v(0.6em, weak: true)
+      set text(weight: "bold")
+      it
+    } else {
+      it
+    }
   }
 
   // ===========================================================================
@@ -346,6 +366,7 @@
     date: date,
     author: author,
     organization: organization,
+    logo: logo,
   )
 
   pagebreak()

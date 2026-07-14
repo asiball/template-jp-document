@@ -56,6 +56,9 @@ $endif$
 $if(organization)$
   organization: [$organization$],
 $endif$
+$if(logo)$
+  logo: image("$logo$", height: 12mm),
+$endif$
 $if(revisions)$
   revisions: (
 $for(revisions)$
