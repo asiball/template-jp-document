@@ -71,9 +71,8 @@
 ) = {
   set page(numbering: none, header: none, footer: none)
 
-  // 上部の細い濃紺ルール
-  v(8mm)
-  accent-rule(weight: 1.4pt)
+  // 上部: ページ上端(余白内の先頭)に配置する全幅のソリッドバー
+  rect(width: 100%, height: 4mm, fill: accent-color, inset: 0pt, outset: 0pt)
   v(1fr)
 
   // タイトル文字数に応じたフォントサイズ(長いタイトルの折り返しで
@@ -81,7 +80,8 @@
   let title-len = if title != none { content-to-string(title).clusters().len() } else { 0 }
   let title-size = if title-len > 16 { 22pt } else { 26pt }
 
-  // タイトルブロック(中央)
+  // タイトルブロック(中央。ページのやや上(光学中心)に来るよう、
+  // 前後の v(1fr) / v(1.4fr) で余白配分を調整している)
   align(center)[
     #if logo != none {
       block(below: 1.2em)[#logo]
@@ -92,20 +92,21 @@
         #organization
       ]
     }
-    #block(below: if subtitle == none { 0em } else { 0.9em })[
+    #block(below: 0.9em)[
       #set par(justify: false, linebreaks: "optimized", leading: 0.45em)
       #set text(font: font-sans, size: title-size, weight: "bold")
       #title
     ]
     #if subtitle != none {
-      block[
+      block(below: 1em)[
         #set text(font: font-sans, size: 14pt, weight: "medium", fill: accent-soft)
         #subtitle
       ]
     }
+    #line(length: 26mm, stroke: 1.5pt + accent-color)
   ]
 
-  v(1fr)
+  v(1.4fr)
 
   // 下部の書誌情報(整列テーブル)
   let info-rows = ()
@@ -231,7 +232,21 @@
   show link: set text(fill: accent-color)
 
   // ---- 強調 ----
-  show strong: set text(weight: "bold")
+  // 小書きかな(「ぁ」「ぃ」「ゃ」等)は字送り(advance width)の右側に
+  // 空白を多く持つグリフ設計のため、そのようなかなで終わる強調テキストの
+  // 直後に半角記号(コロン等)が続くと不自然な空白が生じる(フォント側の
+  // グリフ設計に起因するものであり、cjk-latin-spacing の設定には依らない)。
+  // 該当パターンの直後だけわずかに字送りを詰めて補正する。
+  let small-kana-tail = "ぁぃぅぇぉっゃゅょゎァィゥェォッャュョヮ"
+  show strong: it => {
+    let styled = text(weight: "bold", it.body)
+    let s = content-to-string(it.body)
+    if s.len() > 0 and small-kana-tail.contains(s.last()) {
+      box[#styled#h(-0.12em)]
+    } else {
+      styled
+    }
+  }
 
   // ---- 引用(blockquote) ----
   show quote.where(block: true): it => block(
@@ -248,7 +263,12 @@
   set list(marker: ([•], [–]), indent: 0.3em, spacing: 0.65em)
   set enum(indent: 0.3em, spacing: 0.65em)
 
-  // ---- コードブロック(等幅フォント) ----
+  // ---- コードブロック(等幅フォント・低彩度シンタックスハイライト) ----
+  // 既定のハイライト配色は彩度が高く紙面の青系規律から浮くため、
+  // assets/typst-highlight.tmTheme(低彩度パレット)に差し替える。
+  // "--root ." でのビルドを前提としたルート相対パス。背景色はテーマ側
+  // では指定しておらず、code-bg(下記の block fill)がそのまま透けて見える。
+  set raw(theme: "/assets/typst-highlight.tmTheme")
   show raw: set text(font: font-code)
 
   // 短いコードブロックはページ境界で分割せず丸ごと次ページへ送る

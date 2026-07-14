@@ -17,13 +17,51 @@ BUILD      := build
 TEMPLATE   := template/template.typ
 FONT_DIR   := assets/fonts
 
+# ローカル `make pdf` の検証環境で実測したバージョン(README 参照)。
+# `make pdf-docker` はこれらを Dockerfile 内で固定しているため常に一致する。
+EXPECTED_PANDOC := 3.9
+EXPECTED_TYPST   := 0.13.1
+
 DOCKER_IMAGE   := jp-spec-builder
 DOCKER_TAG     := 1.0
 DOCKER_FULLTAG := $(DOCKER_IMAGE):$(DOCKER_TAG)
 
-.PHONY: pdf pdf-docker docker-build clean
+# `make pdf-docker` に渡す Typst バイナリのチェックサム検証用引数。
+# 未指定の場合、Dockerfile 側は TYPST_SHA256 と ALLOW_UNVERIFIED が
+# 両方とも空ならビルドをエラーで停止する(README 参照)。
+#   make pdf-docker TYPST_SHA256=<sha256>
+#   make pdf-docker ALLOW_UNVERIFIED=1
+TYPST_SHA256     ?=
+ALLOW_UNVERIFIED ?=
 
-pdf: $(BUILD)/$(NAME).pdf
+.PHONY: pdf pdf-docker docker-build clean lint check-versions
+
+pdf: check-versions lint $(BUILD)/$(NAME).pdf
+
+# 実際の pandoc / typst のバージョンを表示し、期待バージョンと異なる場合は
+# 警告を出す(ビルド自体は継続する)。POSIX sh で動作するように書く。
+# シムの typst には --version が無い場合があるため、失敗しても継続する。
+check-versions:
+	@pandoc_line="$$(pandoc --version 2>/dev/null | head -n1)"; \
+	echo "pandoc: $${pandoc_line:-(バージョン取得に失敗しました)}"; \
+	pandoc_ver="$$(printf '%s' "$$pandoc_line" | awk '{print $$2}')"; \
+	if [ "$$pandoc_ver" != "$(EXPECTED_PANDOC)" ]; then \
+		echo "WARNING: pandoc のバージョン($${pandoc_ver:-不明})が期待バージョン($(EXPECTED_PANDOC))と異なります(make pdf-docker で固定環境を使えます)。"; \
+	fi; \
+	typst_line="$$(typst --version 2>/dev/null | head -n1 || true)"; \
+	if [ -z "$$typst_line" ]; then \
+		echo "typst: (バージョン取得に失敗しました。この typst は --version に対応していない可能性があります)"; \
+	else \
+		echo "typst: $$typst_line"; \
+		typst_ver="$$(printf '%s' "$$typst_line" | awk '{print $$2}')"; \
+		if [ "$$typst_ver" != "$(EXPECTED_TYPST)" ]; then \
+			echo "WARNING: typst のバージョン($${typst_ver:-不明})が期待バージョン($(EXPECTED_TYPST))と異なります(make pdf-docker で固定環境を使えます)。"; \
+		fi; \
+	fi
+
+# 簡易 lint(scripts/lint.sh)。見出しの手動採番などを検知する。
+lint:
+	@sh scripts/lint.sh
 
 $(BUILD)/$(NAME).typ: $(SRC) $(TEMPLATE) template/spec.typ
 	@mkdir -p $(BUILD)
@@ -44,11 +82,14 @@ $(BUILD)/$(NAME).pdf: $(BUILD)/$(NAME).typ
 		$(BUILD)/$(NAME).pdf
 
 docker-build:
-	docker build -t $(DOCKER_FULLTAG) -t $(DOCKER_IMAGE):latest .
+	docker build \
+		--build-arg TYPST_SHA256=$(TYPST_SHA256) \
+		--build-arg ALLOW_UNVERIFIED=$(ALLOW_UNVERIFIED) \
+		-t $(DOCKER_FULLTAG) -t $(DOCKER_IMAGE):latest .
 
 pdf-docker: docker-build
 	@mkdir -p $(BUILD)
-	docker run --rm -v $(CURDIR):/work -w /work $(DOCKER_FULLTAG) \
+	docker run --rm --user $$(id -u):$$(id -g) -v $(CURDIR):/work -w /work $(DOCKER_FULLTAG) \
 		sh -c '\
 			mkdir -p $(BUILD) && \
 			pandoc --from markdown --to typst --standalone --template $(TEMPLATE) -o $(BUILD)/$(NAME).typ $(SRC) && \

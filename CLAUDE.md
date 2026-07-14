@@ -7,13 +7,15 @@
 ```sh
 make pdf                      # docs/sample-spec.md を build/sample-spec.pdf にビルド
 make pdf SRC=docs/foo.md      # 任意の Markdown をビルド
+make lint                     # docs/*.md の簡易 lint のみを実行
 make clean                    # build/ を削除
 ```
 
-`make pdf` は 2 段階です。
+`make pdf` は次の順で実行されます。
 
-1. `pandoc --from markdown --to typst --standalone --template template/template.typ -o build/<name>.typ <SRC>`
-2. `typst compile --root . --font-path assets/fonts --ignore-system-fonts build/<name>.typ build/<name>.pdf`
+1. `make lint`(`scripts/lint.sh`)で `docs/*.md` を簡易チェックする。見出しの手動採番(`# 1. foo` 等)を検出したらエラーで停止する。生 Typst(` ```{=typst} `)ブロック内に装飾コード(`set text(` 等)が見つかった場合は警告を表示するが、ビルドは継続する。
+2. `pandoc --from markdown --to typst --standalone --template template/template.typ -o build/<name>.typ <SRC>`
+3. `typst compile --root . --font-path assets/fonts --ignore-system-fonts build/<name>.typ build/<name>.pdf`
 
 pandoc / typst が PATH にない場合は `make pdf-docker` を使う(Docker イメージ内でビルド)。
 
