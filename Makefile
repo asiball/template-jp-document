@@ -85,8 +85,12 @@ ifneq ($(REV_MD_EXISTS),)
 REV_BUILD_YAML := $(BUILD)/$(NAME).revisions.yaml
 METADATA_FLAG  := --metadata-file $(REV_BUILD_YAML)
 REV_PREREQ     := $(REV_BUILD_YAML)
-# pdf-docker の sh -c 内および watch のポーリングループで使う変換コマンド。
-REV_CONVERT    := sh scripts/revisions-md2yaml.sh "$(REV_MD)" > "$(REV_BUILD_YAML)"
+# 変換コマンド($(REV_BUILD_YAML) の生成ルール本体・pdf-docker の sh -c 内・
+# watch のポーリングループで共用)。変換に失敗した場合は書きかけ(空)の出力を
+# 残さない: 失敗時の空 YAML が残ると、ソースより新しい mtime のせいで次回の
+# `make pdf` が変換をスキップし、改訂履歴が静かに欠落した PDF が生成されて
+# しまうため。
+REV_CONVERT    := { sh scripts/revisions-md2yaml.sh "$(REV_MD)" > "$(REV_BUILD_YAML)" || { rm -f "$(REV_BUILD_YAML)"; false; }; }
 else ifneq ($(REV_YAML_EXISTS),)
 METADATA_FLAG  := --metadata-file $(REV_YAML)
 REV_PREREQ     := $(REV_YAML)
@@ -114,46 +118,57 @@ DOCKER_FULLTAG := $(DOCKER_IMAGE):$(DOCKER_TAG)
 TYPST_SHA256     ?=
 ALLOW_UNVERIFIED ?=
 
+# --- SRC / 改訂履歴ファイルの共通検証(check-versions と pdf-docker で共用) ---
+# canned recipe(複数行変数)としてレシピ先頭から $(validate-src) で展開する。
+#
+# 検査内容:
+#   - SRC のパスにスペースが含まれていないか。Make はスペースを含むパスを
+#     引数として安全に扱えない(単語分割される)ため、完全対応はせずに明確な
+#     エラーで停止する(README/CLAUDE.md 参照)。
+#   - SRC に改訂履歴ファイル(.revisions.md / .revisions.yaml)そのものを
+#     指定する誤用の検出。
+#   - SRC の存在確認(章別ファイル分割の場合は 00-meta.md と章ファイルの有無)。
+#   - 改訂履歴ファイルが .revisions.md / .revisions.yaml の両方存在する競合の
+#     検出。
+define validate-src
+@case "$(SRC)" in \
+	*" "*) \
+		echo "ERROR: SRC のパスにスペースは使えません: $(SRC)" >&2; \
+		exit 1 ;; \
+	*.revisions.md|*.revisions.yaml) \
+		echo "ERROR: SRC に改訂履歴ファイル($(SRC))は指定できません。本文の Markdown(docs/<name>.md または docs/<name>/)を指定してください(改訂履歴ファイルはビルド時に自動で読み込まれます)。" >&2; \
+		exit 1 ;; \
+esac
+@if [ ! -e "$(SRC)" ]; then \
+	echo "ERROR: SRC が見つかりません: $(SRC)" >&2; \
+	exit 1; \
+fi
+@if [ -d "$(SRC)" ]; then \
+	if [ ! -f "$(SRC)/00-meta.md" ]; then \
+		echo "ERROR: $(SRC)/00-meta.md が見つかりません(章別ファイル分割には 00-meta.md が必須です。README の「章別ファイル分割」参照)。" >&2; \
+		exit 1; \
+	fi; \
+	if [ -z "$(strip $(NON_META_CHAPTERS))" ]; then \
+		echo "ERROR: $(SRC) に章ファイル([0-9][0-9]-*.md。00-meta.md 以外)が 1 つも見つかりません。" >&2; \
+		exit 1; \
+	fi; \
+fi
+@if [ -f "$(REV_MD)" ] && [ -f "$(REV_YAML)" ]; then \
+	echo "ERROR: $(REV_MD) と $(REV_YAML) が両方存在します。改訂履歴ファイルはどちらか一方のみにしてください(推奨: $(if $(filter 1,$(SRC_IS_DIR)),revisions.md,.revisions.md))。" >&2; \
+	exit 1; \
+fi
+endef
+
 .PHONY: pdf pdf-docker docker-build watch clean lint lint-src check-versions
 
 pdf: check-versions $(BUILD)/$(NAME).pdf
 
-# 実際の pandoc / typst のバージョンを表示し、期待バージョンと異なる場合は
-# 警告を出す(ビルド自体は継続する)。POSIX sh で動作するように書く。
-# シムの typst には --version が無い場合があるため、失敗しても継続する。
-#
-# 冒頭で SRC にスペースが含まれていないかを確認する。Make はスペースを
-# 含むパスを引数として安全に扱えない(単語分割される)ため、完全対応は
-# せずに明確なエラーで停止する(README/CLAUDE.md 参照)。
-# あわせて、SRC に改訂履歴ファイルそのものを指定する誤用と、改訂履歴
-# ファイルが .revisions.md / .revisions.yaml の両方存在する競合も検出する。
+# SRC / 改訂履歴ファイルの検証(validate-src)に続けて、実際の pandoc / typst
+# のバージョンを表示し、期待バージョンと異なる場合は警告を出す(ビルド自体は
+# 継続する)。POSIX sh で動作するように書く。シムの typst には --version が
+# 無い場合があるため、失敗しても継続する。
 check-versions:
-	@case "$(SRC)" in \
-		*" "*) \
-			echo "ERROR: SRC のパスにスペースは使えません: $(SRC)" >&2; \
-			exit 1 ;; \
-		*.revisions.md|*.revisions.yaml) \
-			echo "ERROR: SRC に改訂履歴ファイル($(SRC))は指定できません。本文の Markdown(docs/<name>.md または docs/<name>/)を指定してください(改訂履歴ファイルはビルド時に自動で読み込まれます)。" >&2; \
-			exit 1 ;; \
-	esac
-	@if [ ! -e "$(SRC)" ]; then \
-		echo "ERROR: SRC が見つかりません: $(SRC)" >&2; \
-		exit 1; \
-	fi
-	@if [ -d "$(SRC)" ]; then \
-		if [ ! -f "$(SRC)/00-meta.md" ]; then \
-			echo "ERROR: $(SRC)/00-meta.md が見つかりません(章別ファイル分割には 00-meta.md が必須です。README の「章別ファイル分割」参照)。" >&2; \
-			exit 1; \
-		fi; \
-		if [ -z "$(strip $(NON_META_CHAPTERS))" ]; then \
-			echo "ERROR: $(SRC) に章ファイル([0-9][0-9]-*.md。00-meta.md 以外)が 1 つも見つかりません。" >&2; \
-			exit 1; \
-		fi; \
-	fi
-	@if [ -f "$(REV_MD)" ] && [ -f "$(REV_YAML)" ]; then \
-		echo "ERROR: $(REV_MD) と $(REV_YAML) が両方存在します。改訂履歴ファイルはどちらか一方のみにしてください(推奨: $(if $(filter 1,$(SRC_IS_DIR)),revisions.md,.revisions.md))。" >&2; \
-		exit 1; \
-	fi
+	$(validate-src)
 	@pandoc_line="$$(pandoc --version 2>/dev/null | head -n1)"; \
 	echo "pandoc: $${pandoc_line:-(バージョン取得に失敗しました)}"; \
 	pandoc_ver="$$(printf '%s' "$$pandoc_line" | awk '{print $$2}')"; \
@@ -185,19 +200,24 @@ lint-src:
 	@sh scripts/lint.sh $(SRC_INPUTS)
 
 # .revisions.md が存在する場合のみ定義される中間 YAML の生成ルール。
-# 変換に失敗した場合は書きかけの出力を残さない(次回 make で必ず再試行
-# されるようにするため)。
+# 変換に失敗した場合は書きかけの出力を残さない(REV_CONVERT 自体がクリーン
+# アップを含む。REV_CONVERT 定義箇所のコメント参照)。check-versions を
+# order-only prerequisite にすることで、`make -j` でも検証(改訂履歴ファイル
+# の併存エラー等)が変換より先に完了することを保証する。
 ifneq ($(REV_MD_EXISTS),)
-$(REV_BUILD_YAML): $(REV_MD) scripts/revisions-md2yaml.sh
+$(REV_BUILD_YAML): $(REV_MD) scripts/revisions-md2yaml.sh | check-versions
 	@mkdir -p "$(BUILD)"
-	sh scripts/revisions-md2yaml.sh "$(REV_MD)" > "$@" || { rm -f "$@"; exit 1; }
+	$(REV_CONVERT)
 endif
 
 # $(SRC_INPUTS) は単一ファイルモードでは $(SRC) 1 個、章別ファイル分割モード
 # では 00-meta.md を含む章ファイル一覧(ソート済み)になる。pandoc は複数の
 # 入力ファイルを連結して 1 文書として処理できる(章の自動採番・ファイル横断
 # リンク・脚注・表番号・表紙/目次のいずれも正しく動作することを確認済み)。
-$(BUILD)/$(NAME).typ: $(SRC_INPUTS) $(TEMPLATE) template/spec.typ $(REV_PREREQ)
+# check-versions は order-only prerequisite: `make -j` 時にも SRC の検証が
+# pandoc 実行より先に完了することを保証しつつ、phony ターゲット起因の
+# 不要な再ビルドは発生させない。
+$(BUILD)/$(NAME).typ: $(SRC_INPUTS) $(TEMPLATE) template/spec.typ $(REV_PREREQ) | check-versions
 	@mkdir -p "$(BUILD)"
 	sh scripts/lint.sh $(SRC_INPUTS) && \
 	pandoc \
@@ -224,32 +244,7 @@ docker-build:
 		-t $(DOCKER_FULLTAG) -t $(DOCKER_IMAGE):latest .
 
 pdf-docker: docker-build
-	@case "$(SRC)" in \
-		*" "*) \
-			echo "ERROR: SRC のパスにスペースは使えません: $(SRC)" >&2; \
-			exit 1 ;; \
-		*.revisions.md|*.revisions.yaml) \
-			echo "ERROR: SRC に改訂履歴ファイル($(SRC))は指定できません。本文の Markdown(docs/<name>.md または docs/<name>/)を指定してください(改訂履歴ファイルはビルド時に自動で読み込まれます)。" >&2; \
-			exit 1 ;; \
-	esac
-	@if [ ! -e "$(SRC)" ]; then \
-		echo "ERROR: SRC が見つかりません: $(SRC)" >&2; \
-		exit 1; \
-	fi
-	@if [ -d "$(SRC)" ]; then \
-		if [ ! -f "$(SRC)/00-meta.md" ]; then \
-			echo "ERROR: $(SRC)/00-meta.md が見つかりません(章別ファイル分割には 00-meta.md が必須です。README の「章別ファイル分割」参照)。" >&2; \
-			exit 1; \
-		fi; \
-		if [ -z "$(strip $(NON_META_CHAPTERS))" ]; then \
-			echo "ERROR: $(SRC) に章ファイル([0-9][0-9]-*.md。00-meta.md 以外)が 1 つも見つかりません。" >&2; \
-			exit 1; \
-		fi; \
-	fi
-	@if [ -f "$(REV_MD)" ] && [ -f "$(REV_YAML)" ]; then \
-		echo "ERROR: $(REV_MD) と $(REV_YAML) が両方存在します。改訂履歴ファイルはどちらか一方のみにしてください(推奨: $(if $(filter 1,$(SRC_IS_DIR)),revisions.md,.revisions.md))。" >&2; \
-		exit 1; \
-	fi
+	$(validate-src)
 	@mkdir -p "$(BUILD)"
 	docker run --rm --user $$(id -u):$$(id -g) -v "$(CURDIR)":/work -w /work $(DOCKER_FULLTAG) \
 		sh -c '\
@@ -281,12 +276,10 @@ pdf-docker: docker-build
 #
 # Ctrl-C (SIGINT) / SIGTERM を trap し、バックグラウンドの typst watch を
 # 確実に kill してから終了する。
+#
+# SRC の検証(スペース検査等)は prerequisite の pdf → check-versions
+# (validate-src)で実施済みのため、ここでは繰り返さない。
 watch: pdf
-	@case "$(SRC)" in \
-		*" "*) \
-			echo "ERROR: SRC のパスにスペースは使えません: $(SRC)" >&2; \
-			exit 1 ;; \
-	esac
 	@stamp="$(BUILD)/.watch-stamp-$(NAME)"; \
 	touch "$$stamp"; \
 	typst watch \

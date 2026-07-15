@@ -34,6 +34,17 @@
 // 小書きかな直後の字送り補正量(spec-doc の strong ショウルールで使用)。
 #let small-kana-correction = -0.12em
 
+// コードブロックをページ境界での分割(breakable)に切り替える行数の閾値
+// (spec-doc の raw ショウルールで使用)。この行数以下のブロックは分割せず
+// 丸ごと次ページへ送る。
+#let code-breakable-min-lines = 20
+
+// 脚注セパレータ罫線の幅(spec-doc の footnote 設定で使用)。
+#let footnote-separator-width = 30%
+
+// 表紙ロゴの描画高さ(cover-page で使用。横幅はアスペクト比に応じて自動)。
+#let logo-height = 12mm
+
 // ---- 和文組版グリッド ----------------------------------------------------
 // 行送り設計は okumuralab/typst-js(MIT-0)の方式を参考にした。
 // 和文フォントの仮想ボディは実際のグリフより大きく、Typst の既定の
@@ -80,6 +91,10 @@
 // =============================================================================
 // 表紙
 // =============================================================================
+// logo にはロゴ画像のパス文字列(リポジトリルートからの絶対パス。例:
+// "/assets/logo.png")を渡す。描画高さは logo-height で一元管理する
+// (見た目の責務を spec.typ に集約するため、template.typ 側では image() を
+// 組み立てない)。
 #let cover-page(
   title: none,
   subtitle: none,
@@ -109,7 +124,7 @@
   // 前後の v(1fr) / v(1.4fr) で余白配分を調整している)
   align(center)[
     #if logo != none {
-      block(below: 1.2em)[#logo]
+      block(below: 1.2em)[#image(logo, height: logo-height)]
     }
     #if organization != none {
       block(below: 2em)[
@@ -188,7 +203,7 @@
 // =============================================================================
 // ヘッダ・フッタ(本文用)
 // =============================================================================
-#let doc-header(title: none, docnumber: none) = context {
+#let doc-header(title: none, docnumber: none) = {
   set text(font: font-sans, size: 8pt, fill: header-gray)
   grid(
     columns: (1fr, auto),
@@ -313,7 +328,7 @@
     stroke: 0.6pt + code-border,
     radius: 2pt,
     inset: 8pt,
-    breakable: it.text.split("\n").len() > 20,
+    breakable: it.text.split("\n").len() > code-breakable-min-lines,
   )[
     #set text(size: 8.5pt)
     #set par(justify: false, leading: 0.72em)
@@ -363,7 +378,7 @@
   show figure.caption: set text(font: font-sans, size: 9pt)
 
   // ---- 脚注 ----
-  set footnote.entry(separator: thin-rule(width: 30%, weight: 0.5pt))
+  set footnote.entry(separator: thin-rule(width: footnote-separator-width, weight: 0.5pt))
   show footnote.entry: set text(size: 8.5pt)
 
   // ---- 見出しスタイル ----
