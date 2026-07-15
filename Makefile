@@ -106,6 +106,14 @@ esac
 	echo "ERROR: SRC が見つかりません: $(SRC)" >&2; \
 	exit 1; \
 fi
+@if [ ! -d "$(SRC)" ]; then \
+	case "$(SRC)" in \
+		*.md) : ;; \
+		*) \
+			echo "ERROR: 単一ファイルの SRC は .md 拡張子が必要です: $(SRC)(改訂履歴の自動検出が <name>.md → <name>.revisions.md という命名規約に依存するため。章別ファイル分割の場合はディレクトリを指定してください)。" >&2; \
+			exit 1 ;; \
+	esac; \
+fi
 @if [ -d "$(SRC)" ]; then \
 	if [ ! -f "$(SRC)/00-meta.md" ]; then \
 		echo "ERROR: $(SRC)/00-meta.md が見つかりません(章別ファイル分割には 00-meta.md が必須です。README の「章別ファイル分割」参照)。" >&2; \

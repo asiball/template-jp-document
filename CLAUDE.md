@@ -24,7 +24,7 @@ make clean                    # build/ を削除
 
 pandoc / typst が PATH にない場合は `make pdf-docker` を使う(Docker イメージ内でビルド)。
 
-`SRC` のパスにスペースは使えない(Make の引数分割の制約のため)。スペースを含むパスを指定すると `make pdf` / `make pdf-docker` / `make watch` は明確なエラーメッセージで停止する(章別ファイル分割のディレクトリパスも対象)。
+`SRC` のパスにスペースは使えない(Make の引数分割の制約のため)。スペースを含むパスを指定すると `make pdf` / `make pdf-docker` / `make watch` は明確なエラーメッセージで停止する(章別ファイル分割のディレクトリパスも対象)。単一ファイルの `SRC` は `.md` 拡張子が必須(改訂履歴の自動検出が `<name>.md` → `<name>.revisions.md` という命名規約に依存するため。`.md` 以外はエラーで停止する)。
 
 `make watch` は (a) 初回 `make pdf` 相当を実行 → (b) `typst watch` をバックグラウンド起動(`.typ` / `template/*.typ` の変更を自動検知)→ (c) `<SRC_INPUTS>`(と改訂履歴の別ファイルが存在すればそれも)を 1 秒間隔でポーリングし、変更を検知したら lint →(`.revisions.md` / `revisions.md` があれば YAML 変換)→ pandoc を再実行して `.typ` を再生成する、という三段構成。章別ファイル分割の場合、章ファイルを 1 つ編集して保存するだけで `<SRC_INPUTS>` 全体が pandoc に再度渡され `.typ` 全体が再生成される(章ファイルを新規追加した場合はポーリング対象に含まれないため `make watch` の再起動が必要)。lint / 変換 / pandoc がエラーになっても watch 自体は停止せず継続する(修正して保存すれば次のポーリングで再試行される)。Ctrl-C で `typst watch` の子プロセスごと終了する。詳細は README の「執筆中の自動更新」節を参照。
 
