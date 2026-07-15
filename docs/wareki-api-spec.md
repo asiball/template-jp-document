@@ -6,19 +6,6 @@ version: "1.0"
 date: "2026-07-14"
 author: "佐藤次郎"
 organization: "株式会社サンプル"
-revisions:
-  - version: "0.8"
-    date: "2026-06-01"
-    author: "佐藤次郎"
-    changes: "ドラフト作成"
-  - version: "0.9"
-    date: "2026-06-20"
-    author: "佐藤次郎"
-    changes: "例外仕様と非推奨APIの章を追加"
-  - version: "1.0"
-    date: "2026-07-14"
-    author: "佐藤次郎"
-    changes: "正式版として発行"
 ---
 
 <!--
