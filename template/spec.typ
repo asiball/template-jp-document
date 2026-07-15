@@ -34,6 +34,18 @@
 // 小書きかな直後の字送り補正量(spec-doc の strong ショウルールで使用)。
 #let small-kana-correction = -0.12em
 
+// ---- 和文組版グリッド ----------------------------------------------------
+// 行送り設計は okumuralab/typst-js(MIT-0)の方式を参考にした。
+// 和文フォントの仮想ボディは実際のグリフより大きく、Typst の既定の
+// top-edge(グリフの実測 ascender)のままだと、和文とラテン文字/インライン
+// コードが混在する行で行の基準位置がずれ、行送り(baseline から baseline
+// までの距離)が行によって微妙に変動してしまう。typst-js の cjkheight
+// (0.88em)にならい、和文の仮想ボディ高に top-edge を合わせることで、
+// 欧文混じりの行でも行送りが一定になる。
+// 行送り = top-edge(0.88em) + leading(0.85em) = 1.73em
+// (jsarticle の baselineskip = 1.73 * fontsize と同じピッチ)
+#let cjk-top-edge = 0.88em
+
 // =============================================================================
 // 内部ユーティリティ
 // =============================================================================
@@ -228,10 +240,12 @@
     font: font-serif,
     size: 10pt,
     cjk-latin-spacing: auto,
+    top-edge: cjk-top-edge,
   )
   set par(
     justify: true,
     leading: 0.85em,
+    spacing: 0.85em,
     first-line-indent: (amount: 1em, all: true),
   )
 
@@ -330,6 +344,11 @@
   // Markdown 側で明示された列揃え(:---: 等)は table の align 引数が優先されるため保持される。
   show table.cell: set align(start + horizon)
   show table: set text(size: 9pt)
+  // 本文の top-edge(0.88em)をそのまま表セルにも適用すると、行送りグリッド
+  // 用に嵩上げされた分だけセルの行高(inset 込み)が間延びして見える。
+  // typst-js の補正(2 × cjkheight − 1 = 0.76em)にならい、表セル内だけ
+  // top-edge を下げて行高を詰める。
+  show table: set text(top-edge: 0.76em)
   show table: it => block(
     stroke: (top: 1.1pt + accent-color, bottom: 1.1pt + accent-color),
     inset: 0pt,
@@ -361,7 +380,9 @@
   }
 
   // H2: 節。左に太い濃紺バー。
-  show heading.where(level: 2): it => block(above: 1.6em, below: 0.9em, width: 100%)[
+  // breakable: false, sticky: true で見出しがページ最下部に孤立するのを防ぐ
+  // (見出しの直後の内容が次ページに送られる場合、見出し自体も一緒に送られる)。
+  show heading.where(level: 2): it => block(above: 1.4em, below: 0.75em, width: 100%, breakable: false, sticky: true)[
     #box(
       inset: (left: 0.65em, top: 0.3em, bottom: 0.3em, right: 0.3em),
       stroke: (left: 3pt + accent-color),
@@ -372,13 +393,13 @@
   ]
 
   // H3: 項。
-  show heading.where(level: 3): it => block(above: 1.3em, below: 0.7em)[
+  show heading.where(level: 3): it => block(above: 1.15em, below: 0.6em, breakable: false, sticky: true)[
     #set text(font: font-sans, size: 10.5pt, weight: "bold")
     #it
   ]
 
   // H4 以降: 番号なしの小見出し(レベル 4/5/6 すべて同じ見た目)。
-  let unnumbered-subheading(it) = block(above: 1.1em, below: 0.5em)[
+  let unnumbered-subheading(it) = block(above: 1.1em, below: 0.5em, breakable: false, sticky: true)[
     #set text(font: font-sans, size: 10pt, weight: "bold", style: "normal")
     #it.body
   ]
