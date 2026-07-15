@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  typst-highlight.tmTheme
+
+  本テンプレート(template-jp-document)のコードブロック用シンタックス
+  ハイライト配色。既定のハイライトテーマは彩度の高い配色(赤紫・鮮緑等)を
+  含み、本テンプレートの青系を基調とした紙面から浮いてしまうため、
+  低彩度のパレットで置き換えるために用意した独自テーマ。
+
+  背景色(background)は意図的に指定していない。コードブロックの背景は
+  template/spec.typ の code-bg(#code-border と合わせたごく薄いグレー)で
+  描画するため、テーマ側で背景を塗ると二重になってしまう。
+
+  参照方法: template/spec.typ の spec-doc 内で
+  `set raw(theme: "/assets/typst-highlight.tmTheme")` として読み込む
+  (typst compile のルート相対パスとして解決される前提)。
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>name</key>
+	<string>template-jp-document Muted</string>
+	<key>settings</key>
+	<array>
+		<dict>
+			<key>settings</key>
+			<dict>
+				<key>foreground</key>
+				<string>#2b2b2b</string>
+			</dict>
+		</dict>
+		<dict>
+			<key>name</key>
+			<string>Comment</string>
+			<key>scope</key>
+			<string>comment, comment.line, comment.block</string>
+			<key>settings</key>
+			<dict>
+				<key>fontStyle</key>
+				<string>italic</string>
+				<key>foreground</key>
+				<string>#8a8a8a</string>
+			</dict>
+		</dict>
+		<dict>
+			<key>name</key>
+			<string>Keyword</string>
+			<key>scope</key>
+			<string>keyword, keyword.control, keyword.operator.word, storage, storage.modifier, keyword.other</string>
+			<key>settings</key>
+			<dict>
+				<key>fontStyle</key>
+				<string>bold</string>
+				<key>foreground</key>
+				<string>#1f4e79</string>
+			</dict>
+		</dict>
+		<dict>
+			<key>name</key>
+			<string>String</string>
+			<key>scope</key>
+			<string>string, string.quoted, string.quoted.single, string.quoted.double, string.quoted.triple, string.interpolated, string.regexp</string>
+			<key>settings</key>
+			<dict>
+				<key>foreground</key>
+				<string>#4d7a68</string>
+			</dict>
+		</dict>
+		<dict>
+			<key>name</key>
+			<string>Number / Constant</string>
+			<key>scope</key>
+			<string>constant, constant.numeric, constant.language, constant.character, constant.other</string>
+			<key>settings</key>
+			<dict>
+				<key>foreground</key>
+				<string>#7a5c3d</string>
+			</dict>
+		</dict>
+		<dict>
+			<key>name</key>
+			<string>Function / Entity</string>
+			<key>scope</key>
+			<string>entity.name.function, support.function, meta.function-call, variable.function</string>
+			<key>settings</key>
+			<dict>
+				<key>foreground</key>
+				<string>#3d5a80</string>
+			</dict>
+		</dict>
+		<dict>
+			<key>name</key>
+			<string>Type</string>
+			<key>scope</key>
+			<string>entity.name.type, entity.name.class, support.type, support.class, storage.type</string>
+			<key>settings</key>
+			<dict>
+				<key>foreground</key>
+				<string>#4a6d8c</string>
+			</dict>
+		</dict>
+		<dict>
+			<key>name</key>
+			<string>Entity Name / Tag</string>
+			<key>scope</key>
+			<string>entity.name.tag, entity.other.attribute-name, entity.name.section</string>
+			<key>settings</key>
+			<dict>
+				<key>foreground</key>
+				<string>#3d5a80</string>
+			</dict>
+		</dict>
+		<dict>
+			<key>name</key>
+			<string>Variable</string>
+			<key>scope</key>
+			<string>variable, variable.parameter, variable.other</string>
+			<key>settings</key>
+			<dict>
+				<key>foreground</key>
+				<string>#2b2b2b</string>
+			</dict>
+		</dict>
+		<dict>
+			<key>name</key>
+			<string>Operator / Punctuation</string>
+			<key>scope</key>
+			<string>keyword.operator, punctuation, punctuation.definition, punctuation.separator</string>
+			<key>settings</key>
+			<dict>
+				<key>foreground</key>
+				<string>#5a5a5a</string>
+			</dict>
+		</dict>
+	</array>
+	<key>uuid</key>
+	<string>2c9f2a3e-2a3b-4a56-8f1a-7a6a3f2f2f11</string>
+</dict>
+</plist>
