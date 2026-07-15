@@ -231,6 +231,8 @@
   set page(
     paper: "a4",
     margin: (top: 30mm, bottom: 30mm, left: 25mm, right: 25mm),
+    // フッタ(ページ番号)の位置。既定(30%)より 2mm 下げている
+    footer-descent: 30% + 2mm,
   )
 
   // ---- 基本文字設定(本文は明朝) ----
