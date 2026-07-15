@@ -239,7 +239,10 @@
   set page(
     paper: "a4",
     margin: (top: 30mm, bottom: 30mm, left: 25mm, right: 25mm),
-    // フッタ位置は Typst 既定(footer-descent: 30%)。調整はここで指定する。
+    // フッタ(ページ番号)の位置。Typst 既定の 30% では Word の慣行より数 mm
+    // 高い位置に出るため、下余白 30mm の 40%(本文下端から 12mm)まで下げて
+    // 日本語版 Word の既定(下からのフッタ位置 17.5mm)相当に合わせている。
+    footer-descent: 40%,
   )
 
   // ---- 基本文字設定(本文は明朝) ----
@@ -346,6 +349,10 @@
   // 中央揃えを継承する。既定は左揃え+垂直中央とする(Markdown 側で明示した
   // 列揃えは table の align 引数が優先されるため保持される)。
   show table.cell: set align(start + horizon)
+  // セル内は行長が短く両端揃え(justify)の恩恵がない一方、折り返し時に
+  // 字間が不自然に広がったり記号だけが右端へ押し出されたりするため、
+  // 表の中に限り左揃え(なりゆき)にする。
+  show table: set par(justify: false)
   show table: set text(size: 9pt)
   // 本文用の top-edge(0.88em)のままだと表の行高が間延びするため、typst-js
   // の補正(2 × cjkheight − 1 = 0.76em)にならい表セル内だけ詰める。
@@ -439,7 +446,8 @@
   pagebreak()
 
   // ===========================================================================
-  // 2. 改訂履歴 + 目次(2ページ目以降はヘッダのみ表示、フッタは非表示)
+  // 2. 改訂履歴 → 目次(それぞれ独立したページ。2ページ目以降はヘッダのみ
+  //    表示、フッタは非表示)
   // ===========================================================================
   set page(
     header: doc-header(title: title, docnumber: docnumber),
@@ -449,8 +457,10 @@
 
   revision-history(revisions: revisions)
 
+  // 改訂履歴と目次を同居させると、どちらかが伸びたときに読みにくくなるため
+  // ページを分ける(改訂履歴が無い場合は目次が最初のページに来る)。
   if revisions.len() > 0 {
-    v(2em)
+    pagebreak()
   }
 
   heading(level: 1, numbering: none, outlined: false)[目次]
