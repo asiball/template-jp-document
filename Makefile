@@ -14,11 +14,7 @@
 # バージョンを揃えて決定的な結果を得たい場合は `make pdf-docker` を使うこと。
 
 SRC        ?= docs/sample-spec
-# 末尾スラッシュを除去しておく(SRC=docs/sample-spec/ のような入力に対応)。
-# `make pdf SRC=...` のようにコマンドラインで指定された値は、通常の `:=` では
-# 上書きできない(コマンドライン変数はファイル内の代入より優先されるため)。
-# ここでは意図的に `override` を使い、コマンドライン指定値の末尾スラッシュを
-# 正規化する。
+# 末尾スラッシュを正規化する(コマンドライン指定値の上書きには override が必要)。
 override SRC := $(patsubst %/,%,$(SRC))
 NAME       := $(basename $(notdir $(SRC)))
 BUILD      := build
@@ -27,19 +23,9 @@ FONT_DIR   := assets/fonts
 FONTS      := $(wildcard $(FONT_DIR)/*.otf)
 HIGHLIGHT_THEME := assets/typst-highlight.tmTheme
 
-# 章別ファイル分割(SRC がディレクトリの場合。README の「章別ファイル分割」
-# 節参照)。
-#
-# ディレクトリ規約:
-#   00-meta.md         フロントマター専用(必須)。
-#   [0-9][0-9]-*.md    章ファイル。ファイル名の辞書順が章順になる。
-#                       00-meta.md 自身もこのパターンにマッチするため、
-#                       $(sort ...) した一覧の先頭に自然に来る。
-#   revisions.md / revisions.yaml   改訂履歴(下記 REV_MD/REV_YAML と同じ
-#                       仕組み。数字プレフィックスを持たないため章 glob には
-#                       含まれない)。
-#
-# SRC_IS_DIR はシェルの `test -d` で判定する(make のパース時に 1 回だけ評価)。
+# 章別ファイル分割(SRC がディレクトリの場合)。00-meta.md がフロントマター
+# 専用、[0-9][0-9]-*.md が章ファイルでファイル名の辞書順が章順(規約の詳細は
+# README の「章別ファイル分割」節参照)。
 SRC_IS_DIR := $(shell [ -d "$(SRC)" ] && echo 1)
 
 ifeq ($(SRC_IS_DIR),1)
@@ -59,23 +45,12 @@ REV_MD              := $(patsubst %.md,%.revisions.md,$(SRC))
 REV_YAML            := $(patsubst %.md,%.revisions.yaml,$(SRC))
 endif
 
-# 改訂履歴は次の 2 形式に対応する(README の「改訂履歴の別ファイル化」節参照)。
-#
-#   1. revisions.md  (推奨): Markdown パイプ表(1 改訂 = 1 行)。
-#      scripts/revisions-md2yaml.sh がビルド時に build/<name>.revisions.yaml
-#      へ変換し、それを pandoc の --metadata-file として渡す。
-#   2. revisions.yaml(代替): トップレベルに `revisions:` 配列を持つ
-#      素直な YAML。そのまま --metadata-file として渡す。
-#
-# 両方が存在する場合はどちらを意図しているか判別できないため、check-versions /
-# pdf-docker のガードで明確なエラーにして停止する。どちらも存在しない場合
-# METADATA_FLAG は空になる(フロントマター内の revisions のみを使う従来どおり
-# の挙動)。
-#
-# 注意(Pandoc の合成規則): フロントマター側に revisions があると、
-# --metadata-file 側の revisions より優先される(上書きされる)。そのため
-# revisions はフロントマター・別ファイルのいずれか 1 箇所にのみ書くこと
-# (推奨: .revisions.md / revisions.md。README/CLAUDE.md 参照)。
+# 改訂履歴の別ファイル対応(README の「改訂履歴の別ファイル化」節参照)。
+#   revisions.md  (推奨): scripts/revisions-md2yaml.sh で YAML に変換してから
+#                  pandoc の --metadata-file として渡す。
+#   revisions.yaml(代替): そのまま --metadata-file として渡す。
+# 両方存在する場合は validate-src がエラーで停止する。どちらも無ければ
+# METADATA_FLAG は空(フロントマター内の revisions のみを使う)。
 REV_MD_EXISTS    := $(wildcard $(REV_MD))
 REV_YAML_EXISTS  := $(wildcard $(REV_YAML))
 # watch のポーリング対象(存在する改訂履歴ファイルのみ)
@@ -85,11 +60,9 @@ ifneq ($(REV_MD_EXISTS),)
 REV_BUILD_YAML := $(BUILD)/$(NAME).revisions.yaml
 METADATA_FLAG  := --metadata-file $(REV_BUILD_YAML)
 REV_PREREQ     := $(REV_BUILD_YAML)
-# 変換コマンド($(REV_BUILD_YAML) の生成ルール本体・pdf-docker の sh -c 内・
-# watch のポーリングループで共用)。変換に失敗した場合は書きかけ(空)の出力を
-# 残さない: 失敗時の空 YAML が残ると、ソースより新しい mtime のせいで次回の
-# `make pdf` が変換をスキップし、改訂履歴が静かに欠落した PDF が生成されて
-# しまうため。
+# 変換コマンド(生成ルール・pdf-docker・watch で共用)。失敗時に書きかけの
+# 出力を残さない(残すと mtime 比較で次回の変換がスキップされ、改訂履歴が
+# 静かに欠落するため)。
 REV_CONVERT    := { sh scripts/revisions-md2yaml.sh "$(REV_MD)" > "$(REV_BUILD_YAML)" || { rm -f "$(REV_BUILD_YAML)"; false; }; }
 else ifneq ($(REV_YAML_EXISTS),)
 METADATA_FLAG  := --metadata-file $(REV_YAML)
@@ -101,8 +74,7 @@ REV_PREREQ     :=
 REV_CONVERT    := true
 endif
 
-# 期待バージョン(Dockerfile 内の固定値と揃えている。README 参照)。
-# `make pdf-docker` はこれらを Dockerfile 内で固定しているため常に一致する。
+# 期待バージョン(Dockerfile の固定値と揃える。README 参照)。
 EXPECTED_PANDOC := 3.10
 EXPECTED_TYPST   := 0.15.0
 
@@ -111,27 +83,16 @@ DOCKER_IMAGE   := jp-spec-builder
 DOCKER_TAG     := 2.0
 DOCKER_FULLTAG := $(DOCKER_IMAGE):$(DOCKER_TAG)
 
-# `make pdf-docker` に渡す Typst バイナリのチェックサム検証用引数。
-# 既定では Dockerfile に焼き込まれた sha256(既定の TYPST_VERSION /
-# TYPST_ARCH 用)で検証されるため、通常は指定不要。Typst のバージョンや
-# アーキテクチャを変更する場合のみ、対応する値で上書きする(README 参照)。
+# Typst バイナリのチェックサム検証(既定値は Dockerfile に設定済みのため
+# 通常は指定不要。バージョン/アーキテクチャ変更時のみ上書きする。README 参照)。
 #   make pdf-docker TYPST_SHA256=<sha256>   検証値を差し替える
 #   make pdf-docker ALLOW_UNVERIFIED=1      検証をスキップする(非推奨)
 TYPST_SHA256     ?=
 ALLOW_UNVERIFIED ?=
 
-# --- SRC / 改訂履歴ファイルの共通検証(check-versions と pdf-docker で共用) ---
-# canned recipe(複数行変数)としてレシピ先頭から $(validate-src) で展開する。
-#
-# 検査内容:
-#   - SRC のパスにスペースが含まれていないか。Make はスペースを含むパスを
-#     引数として安全に扱えない(単語分割される)ため、完全対応はせずに明確な
-#     エラーで停止する(README/CLAUDE.md 参照)。
-#   - SRC に改訂履歴ファイル(.revisions.md / .revisions.yaml)そのものを
-#     指定する誤用の検出。
-#   - SRC の存在確認(章別ファイル分割の場合は 00-meta.md と章ファイルの有無)。
-#   - 改訂履歴ファイルが .revisions.md / .revisions.yaml の両方存在する競合の
-#     検出。
+# SRC / 改訂履歴ファイルの共通検証(check-versions と pdf-docker のレシピ
+# 先頭から $(validate-src) で展開する)。スペースを含むパスは Make が単語分割
+# してしまうため、対応せず明確なエラーで停止する。
 define validate-src
 @case "$(SRC)" in \
 	*" "*) \
@@ -165,10 +126,8 @@ endef
 
 pdf: check-versions $(BUILD)/$(NAME).pdf
 
-# SRC / 改訂履歴ファイルの検証(validate-src)に続けて、実際の pandoc / typst
-# のバージョンを表示し、期待バージョンと異なる場合は警告を出す(ビルド自体は
-# 継続する)。POSIX sh で動作するように書く。シムの typst には --version が
-# 無い場合があるため、失敗しても継続する。
+# 検証(validate-src)に続けて pandoc / typst のバージョンを表示し、期待
+# バージョンと異なる場合は警告する(ビルドは継続)。
 check-versions:
 	$(validate-src)
 	@pandoc_line="$$(pandoc --version 2>/dev/null | head -n1)"; \
@@ -193,32 +152,23 @@ check-versions:
 lint:
 	@sh scripts/lint.sh
 
-# ビルド対象の SRC のみを対象に lint だけを単体実行したい場合に使う補助
-# ターゲット(SRC のみ対象。`make pdf` 自体は $(BUILD)/$(NAME).typ のレシピ
-# 先頭で `sh scripts/lint.sh $(SRC_INPUTS) &&` を実行するため、これを
-# prerequisite にはしていない。prerequisite にすると `make -j` 時に pandoc と
-# lint が並行実行され、lint 失敗時にも .typ が生成されてしまう問題があった)。
+# ビルド対象の SRC だけを lint する補助ターゲット。`make pdf` は .typ の
+# レシピ内で lint を実行する(prerequisite にすると -j 時に lint と pandoc が
+# 並行し、lint 失敗でも .typ が生成されてしまうため)。
 lint-src:
 	@sh scripts/lint.sh $(SRC_INPUTS)
 
-# .revisions.md が存在する場合のみ定義される中間 YAML の生成ルール。
-# 変換に失敗した場合は書きかけの出力を残さない(REV_CONVERT 自体がクリーン
-# アップを含む。REV_CONVERT 定義箇所のコメント参照)。check-versions を
-# order-only prerequisite にすることで、`make -j` でも検証(改訂履歴ファイル
-# の併存エラー等)が変換より先に完了することを保証する。
+# .revisions.md がある場合のみ定義される中間 YAML の生成ルール。
+# check-versions は order-only: `make -j` でも検証を変換より先に完了させる。
 ifneq ($(REV_MD_EXISTS),)
 $(REV_BUILD_YAML): $(REV_MD) scripts/revisions-md2yaml.sh | check-versions
 	@mkdir -p "$(BUILD)"
 	$(REV_CONVERT)
 endif
 
-# $(SRC_INPUTS) は単一ファイルモードでは $(SRC) 1 個、章別ファイル分割モード
-# では 00-meta.md を含む章ファイル一覧(ソート済み)になる。pandoc は複数の
-# 入力ファイルを連結して 1 文書として処理できる(章の自動採番・ファイル横断
-# リンク・脚注・表番号・表紙/目次のいずれも正しく動作することを確認済み)。
-# check-versions は order-only prerequisite: `make -j` 時にも SRC の検証が
-# pandoc 実行より先に完了することを保証しつつ、phony ターゲット起因の
-# 不要な再ビルドは発生させない。
+# pandoc は複数の入力ファイル($(SRC_INPUTS))を連結して 1 文書として処理する。
+# check-versions は order-only: -j 時も検証を先に完了させつつ、phony 起因の
+# 再ビルドは起こさない。
 $(BUILD)/$(NAME).typ: $(SRC_INPUTS) $(TEMPLATE) template/spec.typ $(REV_PREREQ) | check-versions
 	@mkdir -p "$(BUILD)"
 	sh scripts/lint.sh $(SRC_INPUTS) && \
@@ -239,11 +189,9 @@ $(BUILD)/$(NAME).pdf: $(BUILD)/$(NAME).typ $(FONTS) $(HIGHLIGHT_THEME)
 		"$(BUILD)/$(NAME).typ" \
 		"$(BUILD)/$(NAME).pdf"
 
-# TYPST_SHA256 / ALLOW_UNVERIFIED は指定された場合のみ --build-arg として
-# 渡す(未指定時に空文字を渡すと、Dockerfile に焼き込まれた既定の sha256 を
-# 潰してしまうため)。TYPST_SHA256 が指定されていればそれで検証し、
-# ALLOW_UNVERIFIED=1 のみが指定された場合は TYPST_SHA256 を明示的に空で渡して
-# 検証をスキップさせる(Dockerfile は TYPST_SHA256 が非空なら常に検証する)。
+# TYPST_SHA256 / ALLOW_UNVERIFIED は指定時のみ --build-arg で渡す(空文字を
+# 渡すと Dockerfile の既定 sha256 を潰すため)。ALLOW_UNVERIFIED=1 単独指定時
+# は sha を明示的に空で渡して検証をスキップさせる。
 docker-build:
 	docker build \
 		$(if $(TYPST_SHA256),--build-arg TYPST_SHA256=$(TYPST_SHA256),$(if $(ALLOW_UNVERIFIED),--build-arg TYPST_SHA256= --build-arg ALLOW_UNVERIFIED=$(ALLOW_UNVERIFIED))) \
@@ -261,30 +209,12 @@ pdf-docker: docker-build
 			typst compile --root . --font-path "$(FONT_DIR)" --ignore-system-fonts "$(BUILD)/$(NAME).typ" "$(BUILD)/$(NAME).pdf" \
 		'
 
-# 執筆中の自動リビルド。
-#   (a) `pdf` を prerequisite にすることで初回ビルド(check-versions を含む)
-#       を通常どおり実行する。
-#   (b) `typst watch` をバックグラウンド起動する。.typ / template/*.typ の
-#       変更は typst watch 自身が検知して自動リコンパイルする。
-#   (c) フォアグラウンドで $(SRC)(と改訂履歴ファイル .revisions.md /
-#       .revisions.yaml が存在すればそれも)を 1 秒間隔でポーリングし、変更を
-#       検知したら lint→(.revisions.md があれば YAML 変換)→pandoc を再実行
-#       して .typ を再生成する(再生成された .typ は typst watch が拾って
-#       自動で PDF に反映する)。
-#
-# POSIX sh のみで実装する(inotifywait/fswatch には依存しない)。mtime 比較は
-# `find -newer` + build/ 内のタイムスタンプファイルで行う(移植性のため
-# bash 拡張の `test -nt` は使わない)。
-#
-# lint エラー・pandoc エラー時は watch を継続する(エラーを表示するだけで
-# 停止しない)。ファイルが修正されて再度保存されれば、次のポーリングで
-# 新しい mtime が検出され自動的に再試行される。
-#
-# Ctrl-C (SIGINT) / SIGTERM を trap し、バックグラウンドの typst watch を
-# 確実に kill してから終了する。
-#
-# SRC の検証(スペース検査等)は prerequisite の pdf → check-versions
-# (validate-src)で実施済みのため、ここでは繰り返さない。
+# 執筆中の自動リビルド: 初回ビルド(pdf)→ typst watch をバックグラウンド起動
+# → $(SRC_INPUTS)(+改訂履歴ファイル)を 1 秒間隔でポーリングし、変更検知で
+# lint → YAML 変換 → pandoc を再実行する(.typ の再生成は typst watch が拾って
+# PDF に反映する)。POSIX sh のみで実装(mtime 比較は `find -newer` + スタンプ
+# ファイル)。lint / pandoc のエラーでは停止せず監視を継続する。Ctrl-C で
+# typst watch ごと終了する。SRC の検証は prerequisite の pdf 側で実施済み。
 watch: pdf
 	@stamp="$(BUILD)/.watch-stamp-$(NAME)"; \
 	touch "$$stamp"; \

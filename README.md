@@ -296,7 +296,7 @@ revisions:
 
 `template/template.typ` 側の `$for(revisions)$` はメタデータの出所(フロントマターか `--metadata-file` か)を区別しないため、どの方式でも生成される改訂履歴表は同一です。
 
-**Pandoc の合成規則**: Pandoc は文書内(YAML フロントマター)のメタデータを `-M` / `--metadata-file` などコマンドラインで指定したメタデータより常に優先します。そのためフロントマター側に `revisions` があると、別ファイル側の `revisions` より**優先されて上書き**されます(このリポジトリの実ビルドで確認済み)。**`revisions` は上記 3 方式のうちどこか 1 箇所にのみ書いてください**。フロントマターと別ファイルの両方に書いてしまうとフロントマター側だけが有効になり、別ファイル側の内容は静かに無視されるので注意してください(`.revisions.md` と `.revisions.yaml` の併存だけはビルド時にエラーとして検出されます)。
+**Pandoc の合成規則**: Pandoc はフロントマターのメタデータを `--metadata-file` で指定したメタデータより常に優先します。フロントマターと別ファイルの両方に `revisions` を書くとフロントマター側だけが有効になり、別ファイル側は静かに無視されます。**`revisions` は上記 3 方式のうちどこか 1 箇所にのみ書いてください**(`.revisions.md` と `.revisions.yaml` の併存だけはビルド時にエラーとして検出されます)。
 
 ## エスケープハッチ(生 Typst の使い方)
 
@@ -330,7 +330,7 @@ revisions:
 
 ## フォント
 
-`assets/fonts/` に同梱しているフォントと、Typst で指定する際の実際のファミリー名は次のとおりです(このリポジトリの検証環境で `fontTools` により実測)。
+`assets/fonts/` に同梱しているフォントと、Typst で指定する際の実際のファミリー名(OpenType name テーブルに基づく)は次のとおりです。
 
 | ファイル | 用途 | Typst 上のファミリー名 | ウェイト |
 |---|---|---|---|
@@ -343,10 +343,7 @@ revisions:
 
 いずれも [Adobe Source Han (Noto CJK 系)](https://github.com/adobe-fonts) のフォントで、[SIL Open Font License 1.1](https://scripts.sil.org/OFL) の下で配布されています。ライセンス条文は `assets/fonts/LICENSE-*.txt` に同梱しています(OFL の再配布条件に従い、フォントとライセンス文書を必ずセットで扱ってください)。
 
-**著作権表示について**:
-
-- `LICENSE-SourceHanCodeJP.txt` には著作権表示のブロックが含まれていません。これは上流の [adobe-fonts/source-han-code-jp](https://github.com/adobe-fonts/source-han-code-jp)(`release` / `master` 両ブランチ)の `LICENSE.txt` 自体に著作権表示ブロックが存在しないためで、本リポジトリでの欠落ではありません。著作権表示は同梱フォントの OpenType name テーブル(nameID 0)に記載されています(`fontTools` で実測: `SourceHanCodeJP-Regular.otf` / `-Bold.otf` ともに `Copyright © 2014-2020 Adobe Systems Incorporated (http://www.adobe.com/), with Reserved Font Name 'Source'.`)。
-- `LICENSE-SourceHanSerif.txt` の著作権年表記(`Copyright 2017-2022`)は、同梱フォント実体の name テーブル(nameID 0: `© 2017-2024 Adobe (http://www.adobe.com/), with Reserved Font Name 'Source'.`)と年が一致していません。上流の [adobe-fonts/source-han-serif](https://github.com/adobe-fonts/source-han-serif) は `release` / `master` いずれのブランチも `LICENSE.txt` の著作権年が `2017-2022` のままで、本リポジトリの `LICENSE-SourceHanSerif.txt` は upstream の `release` ブランチと完全一致しています。つまりこの差異は上流由来であり、本リポジトリで独自に手を加えたものではありません。
+**著作権表示について**: `LICENSE-SourceHanCodeJP.txt` に著作権表示ブロックが無いこと、`LICENSE-SourceHanSerif.txt` の著作権年がフォント実体の name テーブルの年と一致しないことは、いずれも上流リポジトリの `LICENSE.txt` 由来であり、本リポジトリで手を加えたものではありません(著作権表示自体は各フォントの OpenType name テーブルに記載されています)。
 
 **注意(重要)**: `Source Han Code JP` のファイル内部の正式なファミリー名(OpenType name テーブル)は、見かけ上は `Source Han Code JP` ですが、Typst のフォントマッチングでは `Source Han Code JP R` を指定しないと解決できません(`R`/`B` が weight として自動分離されないため)。同様に `Source Han Sans JP Medium` は `Source Han Sans JP`(ファミリー名からウェイト語が自動的に取り除かれる)として解決されます。フォントを差し替える際は、`fontTools` などで name テーブルを確認し、`template/spec.typ` 冒頭の `font-serif` / `font-sans` / `font-code` の値を実際に解決できるファミリー名に合わせて修正してください。
 

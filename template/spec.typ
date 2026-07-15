@@ -46,15 +46,10 @@
 #let logo-height = 12mm
 
 // ---- 和文組版グリッド ----------------------------------------------------
-// 行送り設計は okumuralab/typst-js(MIT-0)の方式を参考にした。
-// 和文フォントの仮想ボディは実際のグリフより大きく、Typst の既定の
-// top-edge(グリフの実測 ascender)のままだと、和文とラテン文字/インライン
-// コードが混在する行で行の基準位置がずれ、行送り(baseline から baseline
-// までの距離)が行によって微妙に変動してしまう。typst-js の cjkheight
-// (0.88em)にならい、和文の仮想ボディ高に top-edge を合わせることで、
-// 欧文混じりの行でも行送りが一定になる。
-// 行送り = top-edge(0.88em) + leading(0.85em) = 1.73em
-// (jsarticle の baselineskip = 1.73 * fontsize と同じピッチ)
+// Typst 既定の top-edge(グリフ実測)のままだと、欧文・インラインコード混在行
+// で行送りが変動する。okumuralab/typst-js(MIT-0)の cjkheight(0.88em)に
+// ならい和文の仮想ボディ高に合わせることで行送りを一定にする。
+// 行送り = top-edge(0.88em) + leading(0.85em) = 1.73em(jsarticle と同じ)
 #let cjk-top-edge = 0.88em
 
 // =============================================================================
@@ -91,10 +86,8 @@
 // =============================================================================
 // 表紙
 // =============================================================================
-// logo にはロゴ画像のパス文字列(リポジトリルートからの絶対パス。例:
-// "/assets/logo.png")を渡す。描画高さは logo-height で一元管理する
-// (見た目の責務を spec.typ に集約するため、template.typ 側では image() を
-// 組み立てない)。
+// logo はロゴ画像のパス文字列(ルート絶対パス。例: "/assets/logo.png")。
+// 描画高さは logo-height で一元管理する(見た目の責務を spec.typ に集約)。
 #let cover-page(
   title: none,
   subtitle: none,
@@ -246,8 +239,7 @@
   set page(
     paper: "a4",
     margin: (top: 30mm, bottom: 30mm, left: 25mm, right: 25mm),
-    // フッタ(ページ番号)の位置は Typst 既定の footer-descent: 30%
-    // (奥村氏 typst-js と同じ)。調整する場合はここに footer-descent を指定する
+    // フッタ位置は Typst 既定(footer-descent: 30%)。調整はここで指定する。
   )
 
   // ---- 基本文字設定(本文は明朝) ----
@@ -273,11 +265,9 @@
   show link: set text(fill: accent-color)
 
   // ---- 強調 ----
-  // 小書きかな(「ぁ」「ぃ」「ゃ」等)は字送り(advance width)の右側に
-  // 空白を多く持つグリフ設計のため、そのようなかなで終わる強調テキストの
-  // 直後に半角記号(コロン等)が続くと不自然な空白が生じる(フォント側の
-  // グリフ設計に起因するものであり、cjk-latin-spacing の設定には依らない)。
-  // 該当パターンの直後だけわずかに字送りを詰めて補正する。
+  // 小書きかな(「ゃ」等)は字送りの右側に空きが大きいグリフ設計のため、
+  // 強調の直後に半角記号が続くと不自然な空白が生じる。該当パターンの直後
+  // だけ字送りを詰めて補正する。
   let small-kana-tail = "ぁぃぅぇぉっゃゅょゎァィゥェォッャュョヮ"
   show strong: it => {
     let styled = text(weight: "bold", it.body)
@@ -305,18 +295,16 @@
   set enum(indent: 0.3em, spacing: 0.65em)
 
   // ---- 定義リスト(Markdown の "Term\n: Description" 記法) ----
-  // Pandoc の既定 Typst テンプレートに由来する装飾(太字の用語 +
-  // インデントされた説明)。見た目の一元化のため template.typ から移設。
+  // 太字の用語 + インデントされた説明(Pandoc の既定テンプレート由来の装飾)。
   show terms.item: it => block(breakable: false)[
     #text(weight: "bold")[#it.term]
     #block(inset: (left: 1.5em, top: -0.4em))[#it.description]
   ]
 
   // ---- コードブロック(等幅フォント・低彩度シンタックスハイライト) ----
-  // 既定のハイライト配色は彩度が高く紙面の青系規律から浮くため、
-  // assets/typst-highlight.tmTheme(低彩度パレット)に差し替える。
-  // "--root ." でのビルドを前提としたルート相対パス。背景色はテーマ側
-  // では指定しておらず、code-bg(下記の block fill)がそのまま透けて見える。
+  // 既定のハイライト配色は彩度が高く紙面から浮くため、低彩度の独自テーマに
+  // 差し替える(--root . 前提のルート相対パス。背景はテーマではなく下記
+  // block の code-bg で描画する)。
   set raw(theme: "/assets/typst-highlight.tmTheme")
   show raw: set text(font: font-code)
 
@@ -335,9 +323,8 @@
     #it
   ]
 
-  // インラインコードは、引用ブロック(fill: luma(250))など背景色を持つ
-  // 領域の上に置かれても輪郭で判別できるよう、極細のボーダーを付ける
-  // (code-bg 自体との明度差だけに頼らない)。
+  // インラインコードには極細のボーダーを付ける(引用ブロックなど背景色を
+  // 持つ領域の上でも輪郭で判別できるようにするため)。
   show raw.where(block: false): box.with(
     fill: code-bg,
     stroke: 0.4pt + luma(225),
@@ -347,24 +334,21 @@
   )
 
   // ---- 表 ----
-  // 注意: show table.cell.where(y:0): set table.cell(fill: ...) は
-  // このバージョンの Typst では反映されないため、table 自体の fill を
-  // 位置関数で与える方式を用いている(bold は show/set text で問題なく反映される)。
+  // ヘッダ行の網掛けは show/set table.cell(fill:) では反映されないため、
+  // table 自体の fill を位置関数で与える。
   set table(
     stroke: none,
     inset: (x: 8pt, y: 7pt),
     fill: (x, y) => if y == 0 { table-header-bg } else { none },
   )
   show table.cell.where(y: 0): set text(font: font-sans, weight: "bold")
-  // Pandoc は表を align(center)[#table(align: (auto, ...))] として出力するため、
-  // 何もしないと本文セルが外側の中央揃えを継承してしまう。既定は左揃え+垂直中央とし、
-  // Markdown 側で明示された列揃え(:---: 等)は table の align 引数が優先されるため保持される。
+  // Pandoc は表を align(center) で包んで出力するため、放置するとセル内容が
+  // 中央揃えを継承する。既定は左揃え+垂直中央とする(Markdown 側で明示した
+  // 列揃えは table の align 引数が優先されるため保持される)。
   show table.cell: set align(start + horizon)
   show table: set text(size: 9pt)
-  // 本文の top-edge(0.88em)をそのまま表セルにも適用すると、行送りグリッド
-  // 用に嵩上げされた分だけセルの行高(inset 込み)が間延びして見える。
-  // typst-js の補正(2 × cjkheight − 1 = 0.76em)にならい、表セル内だけ
-  // top-edge を下げて行高を詰める。
+  // 本文用の top-edge(0.88em)のままだと表の行高が間延びするため、typst-js
+  // の補正(2 × cjkheight − 1 = 0.76em)にならい表セル内だけ詰める。
   show table: set text(top-edge: 0.76em)
   show table: it => block(
     stroke: (top: 1.1pt + accent-color, bottom: 1.1pt + accent-color),
