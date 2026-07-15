@@ -1,14 +1,10 @@
 // =============================================================================
 // template.typ — Pandoc 用 Typst テンプレート
 //
-// `pandoc --from markdown --to typst --template template/template.typ` から
-// 使用される。見た目に関する定義は一切ここに書かず、すべて spec.typ 側の
-// `spec-doc` 関数に委譲する(責務分離)。
-//
-// 以下の定義は `pandoc -D typst` が出力するデフォルトテンプレートに由来し、
-// Pandoc の Typst ライターが前提とする補助定義(水平線・定義リストなど)を
-// 落とさないために保持している。装飾目的の #set 系(フォント・余白・表罫線
-// など)はすべて削除し、spec.typ に一元化した。
+// メタデータを spec.typ の `spec-doc` へ橋渡しするだけで、見た目の定義は
+// 一切書かない(すべて spec.typ に一元化)。horizontalrule などの補助定義は
+// `pandoc -D typst` のデフォルトテンプレート由来で、Pandoc の Typst ライター
+// が前提とするため保持している。
 // -----------------------------------------------------------------------------
 
 #let horizontalrule = line(start: (25%, 0%), end: (75%, 0%))
@@ -52,7 +48,7 @@ $if(organization)$
   organization: [$organization$],
 $endif$
 $if(logo)$
-  logo: image("$logo$", height: 12mm),
+  logo: "$logo$",
 $endif$
 $if(revisions)$
   revisions: (
