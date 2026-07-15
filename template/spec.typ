@@ -349,6 +349,10 @@
   // 中央揃えを継承する。既定は左揃え+垂直中央とする(Markdown 側で明示した
   // 列揃えは table の align 引数が優先されるため保持される)。
   show table.cell: set align(start + horizon)
+  // セル内は行長が短く両端揃え(justify)の恩恵がない一方、折り返し時に
+  // 字間が不自然に広がったり記号だけが右端へ押し出されたりするため、
+  // 表の中に限り左揃え(なりゆき)にする。
+  show table: set par(justify: false)
   show table: set text(size: 9pt)
   // 本文用の top-edge(0.88em)のままだと表の行高が間延びするため、typst-js
   // の補正(2 × cjkheight − 1 = 0.76em)にならい表セル内だけ詰める。
