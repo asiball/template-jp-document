@@ -231,8 +231,8 @@
   set page(
     paper: "a4",
     margin: (top: 30mm, bottom: 30mm, left: 25mm, right: 25mm),
-    // フッタ(ページ番号)の位置。既定(30%)より 2mm 下げている
-    footer-descent: 30% + 2mm,
+    // フッタ(ページ番号)の位置は Typst 既定の footer-descent: 30%
+    // (奥村氏 typst-js と同じ)。調整する場合はここに footer-descent を指定する
   )
 
   // ---- 基本文字設定(本文は明朝) ----
