@@ -38,12 +38,14 @@ CLAUDE.md                          AI エージェント向けの執筆・ビル
 
 ### (a) ローカルに pandoc / typst をインストールする
 
-このテンプレートは次のバージョンで動作確認をしています(このリポジトリの検証環境で実測)。
+このテンプレートは次のバージョンを想定しています(`Dockerfile` / `Makefile` の `EXPECTED_*` で固定)。
 
 | ツール | バージョン | 備考 |
 |---|---|---|
-| pandoc | 3.9 | `pypandoc-binary==1.17` が同梱するバイナリで検証 |
-| typst  | 0.13.1 | Typst コンパイラの実バージョン(選定理由は `Dockerfile` 冒頭のコメントを参照) |
+| pandoc | 3.10 | 公式リリースバイナリ(Docker ビルドでは `pandoc/core:3.10` ベースイメージ) |
+| typst  | 0.15.0 | 公式 GitHub Releases の musl 静的ビルド |
+
+**注意**: Ubuntu の apt が提供する pandoc(24.04 時点で 3.1.3)は Typst ライターが古く、表キャプション・`table.header`・`{.unnumbered}`・脚注などこのテンプレートが前提とする出力に対応していないため使用しないでください。下記の公式リリースバイナリか Docker ビルドを使ってください。
 
 インストール方法の例:
 
@@ -53,9 +55,9 @@ brew install pandoc typst
 
 # Linux / 手動インストール(GitHub Releases から取得)
 # pandoc:
-#   https://github.com/jgm/pandoc/releases/download/3.9/pandoc-3.9-linux-amd64.tar.gz
+#   https://github.com/jgm/pandoc/releases/download/3.10/pandoc-3.10-linux-amd64.tar.gz
 # typst:
-#   https://github.com/typst/typst/releases/download/v0.13.1/typst-x86_64-unknown-linux-musl.tar.xz
+#   https://github.com/typst/typst/releases/download/v0.15.0/typst-x86_64-unknown-linux-musl.tar.xz
 ```
 
 バージョンが異なると、見出し番号の折り返しや表の罫線など細部のレンダリングが変わる可能性があります。厳密に一致させたい場合は Docker ビルド(下記)を使ってください。
@@ -70,16 +72,25 @@ make pdf-docker
 
 `docker run` には `--user $(id -u):$(id -g)` を付与しているため、`build/` 配下に生成されるファイルはホスト側の実行ユーザー所有になります(コンテナ内で root 所有になる問題を避けるため)。
 
-同梱の `Dockerfile` がダウンロードする Typst バイナリは既定で x86_64(Linux, musl 静的ビルド)向けです。Apple Silicon などの別アーキテクチャ上でビルドする場合は `TYPST_ARCH` ビルド引数で差し替えてください(例: `docker build --build-arg TYPST_ARCH=aarch64-unknown-linux-musl .`)。
+同梱の `Dockerfile` がダウンロードする Typst バイナリは既定で x86_64(Linux, musl 静的ビルド)向けです。Apple Silicon などの別アーキテクチャ上でビルドする場合は `TYPST_ARCH` ビルド引数で差し替え、あわせて対応する `TYPST_SHA256`(下記参照)も指定してください(例: `docker build --build-arg TYPST_ARCH=aarch64-unknown-linux-musl --build-arg TYPST_SHA256=<対応するsha256> .`)。
 
 #### Typst バイナリのチェックサム検証
 
-`Dockerfile` は Typst の実行バイナリを GitHub Releases から取得しますが、`TYPST_SHA256` を指定しない場合はビルドを**エラーで停止**します(改ざん・破損したバイナリを気づかずに使ってしまう「暗黙のスキップ」を避けるため)。
+`Dockerfile` は Typst の実行バイナリを GitHub Releases から取得し、`Dockerfile` に焼き込み済みの sha256(既定の `TYPST_VERSION` / `TYPST_ARCH` 用)で必ず検証します。ダウンロードしたバイナリが一致しない場合(改ざん・破損・バージョン不一致)はビルドが**エラーで停止**します。通常の `make pdf-docker` では何も指定する必要はありません。
 
-sha256 の取得方法(ワンライナー):
+参考: v0.15.0 の musl 静的ビルドの sha256(GitHub Releases のアセットダイジェスト):
+
+| アーキテクチャ | sha256 |
+|---|---|
+| `x86_64-unknown-linux-musl`(既定。`Dockerfile` に設定済み) | `59b207df01be2dab9f13e80f73d04d7ff8273ffd46b3dd1b9eef5c60f3eeabea` |
+| `aarch64-unknown-linux-musl` | `cdf50ffc7b8ba759ed02200632eda3d78eb8b99aacb6611f4f75684990647620` |
+
+`TYPST_VERSION` や `TYPST_ARCH` を変更する場合は、対応するアセットの sha256 を取得して差し替えてください。
+
+sha256 の取得方法(ワンライナー。URL のバージョン・アーキテクチャは適宜読み替え):
 
 ```sh
-curl -fsSL "https://github.com/typst/typst/releases/download/v0.13.1/typst-x86_64-unknown-linux-musl.tar.xz" | sha256sum
+curl -fsSL "https://github.com/typst/typst/releases/download/v0.15.0/typst-x86_64-unknown-linux-musl.tar.xz" | sha256sum
 ```
 
 取得した値を指定してビルドする:
@@ -88,7 +99,7 @@ curl -fsSL "https://github.com/typst/typst/releases/download/v0.13.1/typst-x86_6
 make pdf-docker TYPST_SHA256=<取得したsha256>
 ```
 
-チェックサム検証なしでビルドする場合(非推奨。CI 等で明示的に許容する場合のみ):
+チェックサム検証なしでビルドする場合(非推奨。検証値を用意できない例外的な場合のみ。焼き込み済みの既定値による検証もスキップされます):
 
 ```sh
 make pdf-docker ALLOW_UNVERIFIED=1
@@ -96,11 +107,11 @@ make pdf-docker ALLOW_UNVERIFIED=1
 
 #### ベースイメージ(pandoc/core)の digest 固定
 
-`Dockerfile` は既定で `pandoc/core:3.9` をタグ指定で使用しています。タグはリポジトリ側で再 push されうるため、より厳密な決定性が必要な場合は digest を固定してください。
+`Dockerfile` は既定で `pandoc/core:3.10` をタグ指定で使用しています。タグはリポジトリ側で再 push されうるため、より厳密な決定性が必要な場合は digest を固定してください。
 
 ```sh
-docker pull pandoc/core:3.9
-docker inspect --format '{{index .RepoDigests 0}}' pandoc/core:3.9
+docker pull pandoc/core:3.10
+docker inspect --format '{{index .RepoDigests 0}}' pandoc/core:3.10
 # 例: pandoc/core@sha256:<digest>
 ```
 
@@ -369,6 +380,6 @@ Word の変更履歴・コメント往復の代替として、次の運用を推
 
 ## 既知の制約・注意点
 
-- 本テンプレートは Typst 0.13 系の構文を前提としています。
-- Docker イメージの `TYPST_SHA256` はデフォルトで未設定です。ネットワーク制約のある環境で本テンプレートを作成したため実際のチェックサム値を取得できておらず、リポジトリのデフォルト値としては同梱していません。`TYPST_SHA256` と `ALLOW_UNVERIFIED` の両方が未指定の場合、`docker build`(および `make pdf-docker`)は**エラーで停止**します(意図せずチェックサム検証がスキップされる「暗黙のスキップ」を避けるため)。取得方法・指定方法は上記「Typst バイナリのチェックサム検証」を参照してください。
-- `pandoc/core` ベースイメージは既定でタグ(`pandoc/core:3.9`)固定であり、digest 固定ではありません。より厳密な決定性が必要な場合は上記「ベースイメージ(pandoc/core)の digest 固定」の手順に従い `PANDOC_IMAGE` を digest 指定に切り替えてください。
+- 本テンプレートは Typst 0.15 系の構文を前提としています。
+- Docker イメージの `TYPST_SHA256` には、既定の `TYPST_VERSION` / `TYPST_ARCH`(v0.15.0 / x86_64 musl)向けの値が `Dockerfile` に設定済みで、ビルド時に必ず検証されます。Typst のバージョンやアーキテクチャを変更する場合は、対応する sha256 への差し替えが必要です(上記「Typst バイナリのチェックサム検証」参照)。
+- `pandoc/core` ベースイメージは既定でタグ(`pandoc/core:3.10`)固定であり、digest 固定ではありません。より厳密な決定性が必要な場合は上記「ベースイメージ(pandoc/core)の digest 固定」の手順に従い `PANDOC_IMAGE` を digest 指定に切り替えてください。

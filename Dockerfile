@@ -11,34 +11,34 @@
 # ことで一元管理する(README / Makefile と整合させている)。
 # =============================================================================
 
-# このセッションでの検証で確認した pandoc の実バージョンに固定する。
-# (pypandoc-binary==1.17 が同梱する pandoc は `pandoc --version` で 3.9 と報告された)
-# ベースイメージはタグ(pandoc/core:3.9)で固定しているが、タグはリポジトリ側で
+# pandoc のバージョン固定(Makefile の EXPECTED_PANDOC / README と揃える)。
+# ベースイメージはタグ(pandoc/core:3.10)で固定しているが、タグはリポジトリ側で
 # 再 push されうるため digest 固定ではない。より厳密な決定性が必要な場合は、
 # README の手順で実 digest を取得し
 # `--build-arg PANDOC_IMAGE=pandoc/core@sha256:<digest>` を指定すること。
-ARG PANDOC_IMAGE=pandoc/core:3.9
+ARG PANDOC_IMAGE=pandoc/core:3.10
 FROM ${PANDOC_IMAGE}
 
-# Typst の実コンパイラバージョンは、typst (PyPI, Python バインディング) 0.13.7 が
-# 内部で埋め込んでいるコンパイラの自己申告バージョン(#str(sys.version) で確認)に
-# 合わせて 0.13.1 に固定している。ローカル検証との挙動差異を避けるため、
-# Typst のバージョンを変更する場合は README の手順に従って再検証すること。
-ARG TYPST_VERSION=0.13.1
+# Typst コンパイラのバージョン固定(Makefile の EXPECTED_TYPST / README と
+# 揃える)。バージョンを変更する場合は、下記 TYPST_SHA256 も対応する値に
+# 差し替えたうえで、README の手順に従って出力 PDF を再検証すること。
+ARG TYPST_VERSION=0.15.0
 # Typst の GitHub Releases アセット名に含まれるターゲットトリプル。既定は
 # x86_64(Linux, musl 静的ビルド)。Apple Silicon 等の別アーキテクチャ向けに
 # ビルドする場合は `--build-arg TYPST_ARCH=aarch64-unknown-linux-musl` の
-# ように指定する(README の Docker 節を参照)。
+# ように指定する(その場合 TYPST_SHA256 も対応する値に差し替えること。
+# README の Docker 節を参照)。
 ARG TYPST_ARCH=x86_64-unknown-linux-musl
-# 空文字のままではチェックサム検証を行えない(このセッションのネットワーク
-# 制約により GitHub Releases のアセットへ直接アクセスできず、実際の sha256 を
-# 取得できなかったため)。本番運用では README の手順で実値を取得し、
-# `--build-arg TYPST_SHA256=<sha256>` を必ず指定すること。
-ARG TYPST_SHA256=""
-# TYPST_SHA256 を指定せずにビルドする場合、検証なしでバイナリを信頼することに
-# 明示的に同意したことを示すため ALLOW_UNVERIFIED=1 の指定を必須とする
-# (指定がなければビルドをエラーで停止する。「暗黙のスキップ」を避けるための
-# フェイルセーフ)。
+# 既定値は、既定の TYPST_VERSION / TYPST_ARCH(v0.15.0 / x86_64 musl)の
+# リリースアセットの sha256(GitHub Releases が公開するアセットダイジェスト)。
+# TYPST_VERSION / TYPST_ARCH を変更する場合は、README の手順で対応する値を
+# 取得し `--build-arg TYPST_SHA256=<sha256>` で差し替えること(不一致の場合
+# ビルドはエラーで停止する)。
+ARG TYPST_SHA256="59b207df01be2dab9f13e80f73d04d7ff8273ffd46b3dd1b9eef5c60f3eeabea"
+# TYPST_SHA256 を明示的に空(--build-arg TYPST_SHA256=)にしてビルドする場合、
+# 検証なしでバイナリを信頼することに明示的に同意したことを示すため
+# ALLOW_UNVERIFIED=1 の指定を必須とする(指定がなければビルドをエラーで停止
+# する。「暗黙のスキップ」を避けるためのフェイルセーフ)。
 ARG ALLOW_UNVERIFIED=""
 
 USER root

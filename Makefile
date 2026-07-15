@@ -101,20 +101,22 @@ REV_PREREQ     :=
 REV_CONVERT    := true
 endif
 
-# ローカル `make pdf` の検証環境で実測したバージョン(README 参照)。
+# 期待バージョン(Dockerfile 内の固定値と揃えている。README 参照)。
 # `make pdf-docker` はこれらを Dockerfile 内で固定しているため常に一致する。
-EXPECTED_PANDOC := 3.9
-EXPECTED_TYPST   := 0.13.1
+EXPECTED_PANDOC := 3.10
+EXPECTED_TYPST   := 0.15.0
 
 DOCKER_IMAGE   := jp-spec-builder
-DOCKER_TAG     := 1.0
+# ツールチェーン(pandoc / typst)の固定バージョンを変更したら上げる。
+DOCKER_TAG     := 2.0
 DOCKER_FULLTAG := $(DOCKER_IMAGE):$(DOCKER_TAG)
 
 # `make pdf-docker` に渡す Typst バイナリのチェックサム検証用引数。
-# 未指定の場合、Dockerfile 側は TYPST_SHA256 と ALLOW_UNVERIFIED が
-# 両方とも空ならビルドをエラーで停止する(README 参照)。
-#   make pdf-docker TYPST_SHA256=<sha256>
-#   make pdf-docker ALLOW_UNVERIFIED=1
+# 既定では Dockerfile に焼き込まれた sha256(既定の TYPST_VERSION /
+# TYPST_ARCH 用)で検証されるため、通常は指定不要。Typst のバージョンや
+# アーキテクチャを変更する場合のみ、対応する値で上書きする(README 参照)。
+#   make pdf-docker TYPST_SHA256=<sha256>   検証値を差し替える
+#   make pdf-docker ALLOW_UNVERIFIED=1      検証をスキップする(非推奨)
 TYPST_SHA256     ?=
 ALLOW_UNVERIFIED ?=
 
@@ -237,10 +239,14 @@ $(BUILD)/$(NAME).pdf: $(BUILD)/$(NAME).typ $(FONTS) $(HIGHLIGHT_THEME)
 		"$(BUILD)/$(NAME).typ" \
 		"$(BUILD)/$(NAME).pdf"
 
+# TYPST_SHA256 / ALLOW_UNVERIFIED は指定された場合のみ --build-arg として
+# 渡す(未指定時に空文字を渡すと、Dockerfile に焼き込まれた既定の sha256 を
+# 潰してしまうため)。TYPST_SHA256 が指定されていればそれで検証し、
+# ALLOW_UNVERIFIED=1 のみが指定された場合は TYPST_SHA256 を明示的に空で渡して
+# 検証をスキップさせる(Dockerfile は TYPST_SHA256 が非空なら常に検証する)。
 docker-build:
 	docker build \
-		--build-arg TYPST_SHA256=$(TYPST_SHA256) \
-		--build-arg ALLOW_UNVERIFIED=$(ALLOW_UNVERIFIED) \
+		$(if $(TYPST_SHA256),--build-arg TYPST_SHA256=$(TYPST_SHA256),$(if $(ALLOW_UNVERIFIED),--build-arg TYPST_SHA256= --build-arg ALLOW_UNVERIFIED=$(ALLOW_UNVERIFIED))) \
 		-t $(DOCKER_FULLTAG) -t $(DOCKER_IMAGE):latest .
 
 pdf-docker: docker-build
