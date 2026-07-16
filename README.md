@@ -51,7 +51,8 @@ make pdf SRC=docs/my-spec.md
 ├── examples/                         コピー元・参照用の見本(原則書き換えない)
 │   ├── sample-spec/                  サンプル仕様書(章別ファイル分割の実例。下記「章別ファイル分割」参照)
 │   │   ├── 00-meta.md                フロントマター専用ファイル(revisions をフロントマターに直接書く方式の実例)
-│   │   └── 01-introduction.md 〜 99-appendix.md   章ファイル(ファイル名の辞書順が章順)
+│   │   └── 01-introduction.md 〜 99-appendix.md
+│   │                                 章ファイル(ファイル名の辞書順が章順)
 │   ├── wareki-api-spec.md            サンプル仕様書(単一ファイル方式。API リファレンス型のレイアウト実例)
 │   └── wareki-api-spec.revisions.md  改訂履歴を別ファイル化した実例(下記「改訂履歴の別ファイル化」参照)
 ├── template/
