@@ -6,14 +6,14 @@
 # 実行時にマウントした assets/fonts を --font-path で参照する。
 # =============================================================================
 
-# タグ固定(digest 固定が必要な場合は README の手順で PANDOC_IMAGE を上書き)。
+# タグ固定(digest 固定が必要な場合は BUILDING.md の手順で PANDOC_IMAGE を上書き)。
 ARG PANDOC_IMAGE=pandoc/core:3.10
 FROM ${PANDOC_IMAGE}
 
-# Makefile の EXPECTED_* / README と揃える。変更時は TYPST_SHA256 も差し替える。
+# Makefile の EXPECTED_* / BUILDING.md と揃える。変更時は TYPST_SHA256 も差し替える。
 ARG TYPST_VERSION=0.15.0
 # 別アーキテクチャ向けは `--build-arg TYPST_ARCH=aarch64-unknown-linux-musl`
-# 等を指定する(TYPST_SHA256 も対応する値に差し替える。README の Docker 節参照)。
+# 等を指定する(TYPST_SHA256 も対応する値に差し替える。BUILDING.md の Docker 節参照)。
 ARG TYPST_ARCH=x86_64-unknown-linux-musl
 # 既定の TYPST_VERSION / TYPST_ARCH 用の sha256(GitHub Releases のアセット
 # ダイジェスト)。不一致の場合ビルドはエラーで停止する。

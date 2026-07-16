@@ -3,12 +3,12 @@
 # scripts/lint.sh — 仕様書 Markdown の簡易 lint
 #
 # 使い方:
-#   scripts/lint.sh            docs/*.md + docs/*/ の章別ファイル分割を全件検査
+#   scripts/lint.sh            docs/ と examples/ の *.md + 章別ファイル分割を全件検査
 #   scripts/lint.sh file...    指定ファイルのみ検査(`make pdf` がビルド対象を渡す)
 #
-# モード判定: 親ディレクトリが docs 以外、かつファイル名が [0-9][0-9]-*.md の
-# ものを章別ファイル分割として扱う(00-meta.md はメタファイル、それ以外は
-# 章ファイル)。残りはすべて単一ファイルモード。
+# モード判定: 親ディレクトリが docs / examples 以外、かつファイル名が
+# [0-9][0-9]-*.md のものを章別ファイル分割として扱う(00-meta.md はメタ
+# ファイル、それ以外は章ファイル)。残りはすべて単一ファイルモード。
 #
 # エラー(exit 1):
 #   - フロントマターの title: 欠落・空(クォートのみの "" / '' も空扱い)。
@@ -30,8 +30,8 @@
 set -eu
 
 if [ "$#" -eq 0 ]; then
-	set -- docs/*.md
-	for d in docs/*/; do
+	set -- docs/*.md examples/*.md
+	for d in docs/*/ examples/*/; do
 		[ -d "$d" ] || continue
 		d=${d%/}
 		chapters=""
@@ -62,9 +62,10 @@ for f in "$@"; do
 	parent_dir=$(dirname "$f")
 	parent_name=$(basename "$parent_dir")
 	# ファイル名パターンも条件に含める(親ディレクトリ名だけで判定すると
-	# docs/ 外の単一ファイルを章ファイルと誤判定するため)。
+	# docs/ 外の単一ファイルを章ファイルと誤判定するため)。docs / examples
+	# 直下は単一ファイル置き場なので章モードから除外する。
 	is_chapter_mode=0
-	if [ "$parent_name" != "docs" ]; then
+	if [ "$parent_name" != "docs" ] && [ "$parent_name" != "examples" ]; then
 		case "$base" in
 			[0-9][0-9]-*.md) is_chapter_mode=1 ;;
 		esac

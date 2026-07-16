@@ -3,7 +3,7 @@
 # =============================================================================
 #
 # 使い方:
-#   make pdf                     docs/sample-spec(章別ファイル分割)をビルド
+#   make pdf                     examples/sample-spec(章別ファイル分割)をビルド
 #   make pdf SRC=docs/foo.md     単一 Markdown ファイルをビルド
 #   make pdf SRC=docs/foo        章別ファイル分割ディレクトリをビルド
 #   make pdf-docker               Docker コンテナ内でビルド(正のビルド方法)
@@ -13,7 +13,7 @@
 # ローカルの `make pdf` は pandoc / typst が PATH 上にあることを前提とする。
 # バージョンを揃えて決定的な結果を得たい場合は `make pdf-docker` を使うこと。
 
-SRC        ?= docs/sample-spec
+SRC        ?= examples/sample-spec
 # 末尾スラッシュを正規化する(コマンドライン指定値の上書きには override が必要)。
 override SRC := $(patsubst %/,%,$(SRC))
 NAME       := $(basename $(notdir $(SRC)))
@@ -74,7 +74,7 @@ REV_PREREQ     :=
 REV_CONVERT    := true
 endif
 
-# 期待バージョン(Dockerfile の固定値と揃える。README 参照)。
+# 期待バージョン(Dockerfile の固定値と揃える。BUILDING.md 参照)。
 EXPECTED_PANDOC := 3.10
 EXPECTED_TYPST   := 0.15.0
 
@@ -84,7 +84,7 @@ DOCKER_TAG     := 2.0
 DOCKER_FULLTAG := $(DOCKER_IMAGE):$(DOCKER_TAG)
 
 # Typst バイナリのチェックサム検証(既定値は Dockerfile に設定済みのため
-# 通常は指定不要。バージョン/アーキテクチャ変更時のみ上書きする。README 参照)。
+# 通常は指定不要。バージョン/アーキテクチャ変更時のみ上書きする。BUILDING.md 参照)。
 #   make pdf-docker TYPST_SHA256=<sha256>   検証値を差し替える
 #   make pdf-docker ALLOW_UNVERIFIED=1      検証をスキップする(非推奨)
 TYPST_SHA256     ?=
@@ -156,7 +156,7 @@ check-versions:
 	fi
 
 # 簡易 lint(scripts/lint.sh)。見出しの手動採番などを検知する。
-# `make lint` 単体は従来どおり docs/*.md 全件を対象にする。
+# `make lint` 単体は docs/ と examples/ の Markdown 全件を対象にする。
 lint:
 	@sh scripts/lint.sh
 
