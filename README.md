@@ -365,7 +365,7 @@ revisions:
 - **バージョンピン**: `Dockerfile` で pandoc(ベースイメージ)と typst(`ARG TYPST_VERSION`)のバージョンを固定しています。
 - **`--ignore-system-fonts`**: `typst compile` に必ず付与し、実行環境にインストールされているフォントの影響を受けないようにしています。フォントは `assets/fonts/`(`--font-path`)のみを参照します。
 - **`date: none`**: `spec-doc` 内部で PDF のドキュメントメタデータの `date` は常に `none` に設定しています(ビルド実行時刻を PDF に埋め込まない)。表紙に表示される発行日は YAML メタデータの `date` フィールド(文字列)であり、ビルド時刻とは無関係です。
-- **CI での検証**: GitHub Actions(`.github/workflows/build.yml`)が PR と main への push のたびに `make pdf-docker` で同梱サンプル 2 種(章別ファイル分割・単一ファイル)をビルドし、固定ツールチェーンの取得(ベースイメージのタグ・Typst の sha256 検証を含む)から PDF 生成までを通しで検証します。生成された PDF はワークフローのアーティファクトとしてダウンロードでき、PR 上で見た目を確認できます。
+- **CI での検証**: GitHub Actions(`.github/workflows/build.yml`)が PR のたびに `make pdf-docker` で同梱サンプル 2 種(章別ファイル分割・単一ファイル)をビルドし、固定ツールチェーンの取得(ベースイメージのタグ・Typst の sha256 検証を含む)から PDF 生成までを通しで検証します。生成された PDF はワークフローのアーティファクトとしてダウンロードでき、PR 上で見た目を確認できます。
 
 ## レビュー・納品の運用(推奨)
 
