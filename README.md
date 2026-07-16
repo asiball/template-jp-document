@@ -46,26 +46,32 @@ make pdf SRC=docs/my-spec.md
 ## ディレクトリ構成
 
 ```
-docs/                              自分の仕様書(原稿)の置き場所。ビルド・lint の対象
-examples/sample-spec/              サンプル仕様書(章別ファイル分割の実例。下記「章別ファイル分割」参照)
-examples/sample-spec/00-meta.md      フロントマター専用ファイル(revisions もフロントマター内に直接記述する方式の実例)
-examples/sample-spec/01-introduction.md 〜 99-appendix.md  章ファイル(ファイル名の辞書順が章順)
-examples/wareki-api-spec.md        サンプル仕様書(単一ファイル方式。API リファレンス型のレイアウト実例)
-examples/wareki-api-spec.revisions.md  上記の改訂履歴を別ファイル化した実例(Markdown パイプ表。下記「改訂履歴の別ファイル化」参照)
-template/spec.typ                  テーマ本体。美観に関する定義はすべてここに集約
-template/template.typ              Pandoc 用 Typst テンプレート(構造の橋渡しのみ)
-assets/fonts/                      同梱フォントと OFL ライセンス
-assets/images/                     Markdown 本文から参照する図版(PNG/JPG/SVG)
-assets/typst-highlight.tmTheme     コードブロックのシンタックスハイライト配色(低彩度パレット)
-scripts/lint.sh                    docs/ と examples/ の Markdown の簡易 lint(手動採番・フロントマター不備・脚注ID重複の検出など。`make lint` / `make pdf` から実行)
-scripts/revisions-md2yaml.sh       改訂履歴の Markdown パイプ表 → YAML 変換(`make pdf` がビルド時に自動実行)
-Dockerfile                         決定的なビルド環境(BUILDING.md 参照)
-Makefile                           ビルドコマンド一式
-README.md                          このファイル
-GETTING-STARTED.md                 非技術者向けクイックスタート(Markdown 初心者の PM・品証向け)
-BUILDING.md                        ビルド環境の詳細(バージョン固定・Docker・チェックサム検証・フォント差し替え)
-CLAUDE.md                          AI エージェント向けの執筆・ビルドガイド
-LICENSE                            テンプレートコードのライセンス(MIT。フォントは対象外。「ライセンス」節を参照)
+.
+├── docs/                             自分の仕様書(原稿)の置き場所。ビルド・lint の対象
+├── examples/                         コピー元・参照用の見本(原則書き換えない)
+│   ├── sample-spec/                  サンプル仕様書(章別ファイル分割の実例。下記「章別ファイル分割」参照)
+│   │   ├── 00-meta.md                フロントマター専用ファイル(revisions をフロントマターに直接書く方式の実例)
+│   │   └── 01-introduction.md 〜 99-appendix.md   章ファイル(ファイル名の辞書順が章順)
+│   ├── wareki-api-spec.md            サンプル仕様書(単一ファイル方式。API リファレンス型のレイアウト実例)
+│   └── wareki-api-spec.revisions.md  改訂履歴を別ファイル化した実例(下記「改訂履歴の別ファイル化」参照)
+├── template/
+│   ├── spec.typ                      テーマ本体。美観に関する定義はすべてここに集約
+│   └── template.typ                  Pandoc 用 Typst テンプレート(構造の橋渡しのみ)
+├── assets/
+│   ├── fonts/                        同梱フォントと OFL ライセンス
+│   ├── images/                       Markdown 本文から参照する図版(PNG/JPG/SVG)
+│   └── typst-highlight.tmTheme       コードブロックのシンタックスハイライト配色(低彩度パレット)
+├── scripts/
+│   ├── lint.sh                       docs/ と examples/ の Markdown の簡易 lint(`make lint` / `make pdf` から実行)
+│   └── revisions-md2yaml.sh          改訂履歴の Markdown パイプ表 → YAML 変換(`make pdf` がビルド時に自動実行)
+├── .github/workflows/build.yml       CI(PR ごとに make pdf-docker でサンプルをビルド検証)
+├── Dockerfile                        決定的なビルド環境(BUILDING.md 参照)
+├── Makefile                          ビルドコマンド一式
+├── README.md                         このファイル
+├── GETTING-STARTED.md                非技術者向けクイックスタート(Markdown 初心者の PM・品証向け)
+├── BUILDING.md                       ビルド環境の詳細(バージョン固定・Docker・チェックサム検証・フォント差し替え)
+├── CLAUDE.md                         AI エージェント向けの執筆・ビルドガイド
+└── LICENSE                           テンプレートコードのライセンス(MIT。フォントは対象外。「ライセンス」節を参照)
 ```
 
 `docs/` が利用者の原稿置き場、`examples/` がコピー元・参照用の見本です。`examples/` 配下は README・CLAUDE.md から実例として参照されているため、書き換えずに残しておくことを推奨します(サンプルが不要になったら削除しても、テンプレートの動作自体には影響しません。その場合は `Makefile` のデフォルト `SRC` を自分の文書に向け直してください)。
