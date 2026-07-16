@@ -32,7 +32,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Lint(docs 全件)
+      - name: Lint(docs / examples 全件)
         run: make lint
 
       # 1 回目の pdf-docker が docker-build(イメージ構築)を含む。
@@ -41,7 +41,7 @@ jobs:
         run: make pdf-docker
 
       - name: Build wareki-api-spec(単一ファイル + 改訂履歴別ファイル)
-        run: make pdf-docker SRC=docs/wareki-api-spec.md
+        run: make pdf-docker SRC=examples/wareki-api-spec.md
 
       - name: Upload PDFs
         uses: actions/upload-artifact@v4
