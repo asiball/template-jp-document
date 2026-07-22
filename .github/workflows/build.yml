@@ -6,6 +6,8 @@
 #     Typst 固定バージョン + sha256 検証)が実際に取得・構築できること
 #   - 同梱サンプル(章別ファイル分割・単一ファイルの両方式)が lint を通過し
 #     PDF まで到達すること(バージョンを上げる PR ではここが回帰検知になる)
+#   - scripts/lint.sh の回帰テスト(make test)が通ること(lint のルール変更
+#     による検出漏れ・誤検知をビルド前に検知する)
 # 生成した PDF はアーティファクトとして保存し、PR 上で見た目を確認できる。
 #
 # main への push では実行しない(マージされる内容は直前の PR の実行で検証済み
@@ -31,6 +33,9 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+
+      - name: Test(scripts/lint.sh の回帰テスト)
+        run: make test
 
       - name: Lint(docs / examples 全件)
         run: make lint
