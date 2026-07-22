@@ -5,8 +5,8 @@
 # 使い方:
 #   scripts/puml2svg.sh <input.puml> <output.svg>
 #
-# リポジトリルートから実行されることを前提とする(Makefile / pdf-docker /
-# watch から呼ばれる。PLANTUML_CONFIG の既定値がルート相対のため)。
+# リポジトリルートから実行されることを前提とする(scripts/container-build.sh
+# から呼ばれる。PLANTUML_CONFIG の既定値がルート相対のため)。
 #
 # 環境変数:
 #   PLANTUML         plantuml の実行コマンド(既定: plantuml)。
@@ -35,10 +35,7 @@ PLANTUML_CONFIG=${PLANTUML_CONFIG:-template/plantuml.config}
 
 first_word=${PLANTUML%% *}
 if ! command -v "$first_word" >/dev/null 2>&1; then
-	echo "ERROR: plantuml が見つかりません($PLANTUML)。次のいずれかで解決してください。" >&2
-	echo "  - plantuml をインストールして PATH に追加する(例: brew install plantuml)" >&2
-	echo "  - jar を直接指定する: make pdf PLANTUML='java -jar /path/to/plantuml.jar'" >&2
-	echo "  - Docker でビルドする: make pdf-docker(インストール不要。BUILDING.md 参照)" >&2
+	echo "ERROR: plantuml が見つかりません($PLANTUML)。ビルドは Docker イメージ内での実行が前提です(make pdf を使ってください。イメージには plantuml が同梱されています)。" >&2
 	exit 1
 fi
 

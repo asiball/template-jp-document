@@ -6,25 +6,22 @@
 #   make pdf                     examples/sample-spec(章別ファイル分割)をビルド
 #   make pdf SRC=docs/foo.md     単一 Markdown ファイルをビルド
 #   make pdf SRC=docs/foo        章別ファイル分割ディレクトリをビルド
-#   make pdf-docker               Docker コンテナ内でビルド(正のビルド方法)
-#   make watch                    執筆中の自動リビルド(README の「執筆中の自動更新」参照)
-#   make clean                    build/ を削除
+#   make watch                   執筆中の自動リビルド(README の「執筆中の自動更新」参照)
+#   make lint                    docs/ と examples/ の Markdown の簡易 lint のみを実行
+#   make test                    scripts/lint.sh 自体の回帰テストを実行
+#   make clean                   build/ を削除
 #
-# ローカルの `make pdf` は pandoc / typst が PATH 上にあることを前提とする。
-# バージョンを揃えて決定的な結果を得たい場合は `make pdf-docker` を使うこと。
+# ビルドはすべて Docker コンテナ内で実行する(pandoc / typst / plantuml と
+# フォントは Dockerfile が固定バージョン+チェックサム検証で導入する。
+# BUILDING.md 参照)。Makefile はビルド対象の導出と検証を担い、ビルド本体は
+# scripts/container-build.sh が担う。lint(scripts/lint.sh)のみ POSIX sh
+# だけで動くためローカルで直接実行する。
 
 SRC        ?= examples/sample-spec
 # 末尾スラッシュを正規化する(コマンドライン指定値の上書きには override が必要)。
 override SRC := $(patsubst %/,%,$(SRC))
 NAME       := $(basename $(notdir $(SRC)))
 BUILD      := build
-# 中間生成物(.typ / 改訂履歴 YAML / watch スタンプ)の置き場所。最終成果物の
-# PDF は $(BUILD) 直下、変換済みの図は $(DIAGRAM_OUT) に分ける。
-OBJ        := $(BUILD)/obj
-TEMPLATE   := template/template.typ
-FONT_DIR   := assets/fonts
-FONTS      := $(wildcard $(FONT_DIR)/*.otf)
-HIGHLIGHT_THEME := assets/typst-highlight.tmTheme
 
 # 章別ファイル分割(SRC がディレクトリの場合)。00-meta.md がフロントマター
 # 専用、[0-9][0-9]-*.md が章ファイルでファイル名の辞書順が章順(規約の詳細は
@@ -48,68 +45,38 @@ REV_MD              := $(patsubst %.md,%.revisions.md,$(SRC))
 REV_YAML            := $(patsubst %.md,%.revisions.yaml,$(SRC))
 endif
 
-# 改訂履歴の別ファイル対応(README の「改訂履歴の別ファイル化」節参照)。
-#   revisions.md  (推奨): scripts/revisions-md2yaml.sh で YAML に変換してから
-#                  pandoc の --metadata-file として渡す。
-#   revisions.yaml(代替): そのまま --metadata-file として渡す。
-# 両方存在する場合は validate-src がエラーで停止する。どちらも無ければ
-# METADATA_FLAG は空(フロントマター内の revisions のみを使う)。
+# 改訂履歴の別ファイル(README の「改訂履歴の別ファイル化」節参照)。存在の
+# 判定だけを行い、変換・--metadata-file の付与は container-build.sh が行う。
+# 両方存在する場合は validate-src がエラーで停止する。
 REV_MD_EXISTS    := $(wildcard $(REV_MD))
 REV_YAML_EXISTS  := $(wildcard $(REV_YAML))
-# watch のポーリング対象(存在する改訂履歴ファイルのみ)
-REV_WATCH        := $(REV_MD_EXISTS) $(REV_YAML_EXISTS)
-
-ifneq ($(REV_MD_EXISTS),)
-REV_BUILD_YAML := $(OBJ)/$(NAME).revisions.yaml
-METADATA_FLAG  := --metadata-file $(REV_BUILD_YAML)
-REV_PREREQ     := $(REV_BUILD_YAML)
-# 変換コマンド(生成ルール・pdf-docker・watch で共用)。失敗時に書きかけの
-# 出力を残さない(残すと mtime 比較で次回の変換がスキップされ、改訂履歴が
-# 静かに欠落するため)。
-REV_CONVERT    := { sh scripts/revisions-md2yaml.sh "$(REV_MD)" > "$(REV_BUILD_YAML)" || { rm -f "$(REV_BUILD_YAML)"; false; }; }
-else ifneq ($(REV_YAML_EXISTS),)
-METADATA_FLAG  := --metadata-file $(REV_YAML)
-REV_PREREQ     := $(REV_YAML)
-REV_CONVERT    := true
-else
-METADATA_FLAG  :=
-REV_PREREQ     :=
-REV_CONVERT    := true
-endif
 
 # PlantUML 図の変換(README の「図の挿入」節参照)。Markdown は変換後の
 # /build/diagrams/<name>.svg を画像参照し(ビルド後はエディタの Markdown
-# プレビューでもそのまま表示できる)、make が参照 SVG から名前の 1:1 対応で
+# プレビューでもそのまま表示できる)、参照 SVG から名前の 1:1 対応で
 # assets/diagrams/<name>.puml を逆引きして変換する。参照抽出はコードフェンス
 # を除外するため scripts/list-diagram-refs.sh で行う。SRC が参照する図だけを
-# 変換し、図を使わない文書のビルドには plantuml を要求しない。
+# 変換する。
 DIAGRAM_DIR     := assets/diagrams
 DIAGRAM_OUT     := $(BUILD)/diagrams
-PLANTUML        ?= plantuml
-PLANTUML_CONFIG := template/plantuml.config
 DIAGRAM_SVGS    := $(sort $(shell sh scripts/list-diagram-refs.sh $(SRC_INPUTS) 2>/dev/null))
 DIAGRAM_PUMLS   := $(patsubst $(DIAGRAM_OUT)/%.svg,$(DIAGRAM_DIR)/%.puml,$(DIAGRAM_SVGS))
 
-# 期待バージョン(Dockerfile の固定値と揃える。BUILDING.md 参照)。
-EXPECTED_PANDOC := 3.10
-EXPECTED_TYPST   := 0.15.0
-EXPECTED_PLANTUML := 1.2026.6
-
 DOCKER_IMAGE   := jp-spec-builder
-# ツールチェーン(pandoc / typst / plantuml)の固定バージョンを変更したら上げる。
-DOCKER_TAG     := 2.1
+# ツールチェーン(pandoc / typst / plantuml / フォント)の固定バージョンを変更したら上げる。
+DOCKER_TAG     := 3.0
 DOCKER_FULLTAG := $(DOCKER_IMAGE):$(DOCKER_TAG)
 
 # Typst バイナリのチェックサム検証(既定値は Dockerfile に設定済みのため
 # 通常は指定不要。バージョン/アーキテクチャ変更時のみ上書きする。BUILDING.md 参照)。
-#   make pdf-docker TYPST_SHA256=<sha256>   検証値を差し替える
-#   make pdf-docker ALLOW_UNVERIFIED=1      検証をスキップする(非推奨)
+#   make pdf TYPST_SHA256=<sha256>   検証値を差し替える
+#   make pdf ALLOW_UNVERIFIED=1      検証をスキップする(非推奨)
 TYPST_SHA256     ?=
 ALLOW_UNVERIFIED ?=
 
-# SRC / 改訂履歴ファイルの共通検証(check-versions と pdf-docker のレシピ
-# 先頭から $(validate-src) で展開する)。スペースを含むパスは Make が単語分割
-# してしまうため、対応せず明確なエラーで停止する。
+# SRC / 改訂履歴ファイルの共通検証(validate ターゲットから展開する)。
+# スペースを含むパスは Make が単語分割してしまうため、対応せず明確なエラーで
+# 停止する。
 define validate-src
 @case "$(SRC)" in \
 	*" "*) \
@@ -155,97 +122,29 @@ fi
 fi
 endef
 
-.PHONY: pdf pdf-docker docker-build watch clean lint lint-src test check-versions diagrams
+# ビルド対象の導出結果を container-build.sh へ渡す環境変数(スクリプト冒頭の
+# 環境変数一覧と揃える)。
+CONTAINER_ENV := \
+	-e NAME="$(NAME)" \
+	-e SRC_INPUTS="$(SRC_INPUTS)" \
+	-e REV_MD="$(REV_MD_EXISTS)" \
+	-e REV_YAML="$(REV_YAML_EXISTS)" \
+	-e DIAGRAM_PUMLS="$(DIAGRAM_PUMLS)"
 
-pdf: check-versions $(BUILD)/$(NAME).pdf
+# --user: build/ 配下の生成物をホスト側の実行ユーザー所有にする(コンテナ内
+# root 所有で残ると消せなくなるため)。
+DOCKER_RUN := docker run --rm --user $$(id -u):$$(id -g) -v "$(CURDIR)":/work -w /work
 
-# 検証(validate-src)に続けて pandoc / typst のバージョンを表示し、期待
-# バージョンと異なる場合は警告する(ビルドは継続)。
-check-versions:
+.PHONY: pdf docker-build validate watch clean lint lint-src test
+
+# SRC の検証を独立ターゲットにして、イメージ構築(docker-build)より先に
+# 安価な検証で失敗できるようにする(prerequisite の並び順で先行させる)。
+validate:
 	$(validate-src)
-	@pandoc_line="$$(pandoc --version 2>/dev/null | head -n1)"; \
-	echo "pandoc: $${pandoc_line:-(バージョン取得に失敗しました)}"; \
-	pandoc_ver="$$(printf '%s' "$$pandoc_line" | awk '{print $$2}')"; \
-	if [ "$$pandoc_ver" != "$(EXPECTED_PANDOC)" ]; then \
-		echo "WARNING: pandoc のバージョン($${pandoc_ver:-不明})が期待バージョン($(EXPECTED_PANDOC))と異なります(make pdf-docker で固定環境を使えます)。"; \
-	fi; \
-	typst_line="$$(typst --version 2>/dev/null | head -n1 || true)"; \
-	if [ -z "$$typst_line" ]; then \
-		echo "typst: (バージョン取得に失敗しました。この typst は --version に対応していない可能性があります)"; \
-	else \
-		echo "typst: $$typst_line"; \
-		typst_ver="$$(printf '%s' "$$typst_line" | awk '{print $$2}')"; \
-		if [ "$$typst_ver" != "$(EXPECTED_TYPST)" ]; then \
-			echo "WARNING: typst のバージョン($${typst_ver:-不明})が期待バージョン($(EXPECTED_TYPST))と異なります(make pdf-docker で固定環境を使えます)。"; \
-		fi; \
-	fi
-	@if [ -n "$(strip $(DIAGRAM_SVGS))" ]; then \
-		plantuml_line="$$($(PLANTUML) -version 2>/dev/null | head -n1 || true)"; \
-		echo "plantuml: $${plantuml_line:-(バージョン取得に失敗しました。未インストールの場合は変換時に案内を表示します)}"; \
-		plantuml_ver="$$(printf '%s' "$$plantuml_line" | awk '{print $$3}')"; \
-		if [ -n "$$plantuml_line" ] && [ "$$plantuml_ver" != "$(EXPECTED_PLANTUML)" ]; then \
-			echo "WARNING: plantuml のバージョン($${plantuml_ver:-不明})が期待バージョン($(EXPECTED_PLANTUML))と異なります(make pdf-docker で固定環境を使えます)。"; \
-		fi; \
-	fi
 
-# 簡易 lint(scripts/lint.sh)。見出しの手動採番などを検知する。
-# `make lint` 単体は docs/ と examples/ の Markdown 全件を対象にする。
-lint:
-	@sh scripts/lint.sh
-
-# ビルド対象の SRC だけを lint する補助ターゲット。`make pdf` は .typ の
-# レシピ内で lint を実行する(prerequisite にすると -j 時に lint と pandoc が
-# 並行し、lint 失敗でも .typ が生成されてしまうため)。
-lint-src:
-	@sh scripts/lint.sh $(SRC_INPUTS)
-
-# scripts/lint.sh 自体の回帰テスト(検出すべき違反を検出し、正常な原稿を
-# 誤検知しないことをサンドボックス上のフィクスチャで検証する)。
-test:
-	@sh scripts/test-lint.sh
-
-# .revisions.md がある場合のみ定義される中間 YAML の生成ルール。
-# check-versions は order-only: `make -j` でも検証を変換より先に完了させる。
-ifneq ($(REV_MD_EXISTS),)
-$(REV_BUILD_YAML): $(REV_MD) scripts/revisions-md2yaml.sh | check-versions
-	@mkdir -p "$(OBJ)"
-	$(REV_CONVERT)
-endif
-
-# PlantUML → SVG の変換ルール(変更された .puml だけを再変換する)。
-# check-versions を依存に持たせない: watch のポーリングループがサブ make で
-# このルールを頻繁に呼ぶため、phony な検証を挟むと保存のたびにバージョン
-# 表示が繰り返されてしまう(SRC の検証は pdf / pdf-docker の経路で実施済み)。
-$(DIAGRAM_OUT)/%.svg: $(DIAGRAM_DIR)/%.puml $(PLANTUML_CONFIG) scripts/puml2svg.sh
-	@PLANTUML="$(PLANTUML)" sh scripts/puml2svg.sh "$<" "$@"
-
-# SRC が参照する図だけを変換する補助ターゲット(watch のポーリングループが
-# 再変換に使う。レシピの @: は「Nothing to be done」の表示抑止)。
-diagrams: $(DIAGRAM_SVGS)
-	@:
-
-# pandoc は複数の入力ファイル($(SRC_INPUTS))を連結して 1 文書として処理する。
-# check-versions は order-only: -j 時も検証を先に完了させつつ、phony 起因の
-# 再ビルドは起こさない。
-$(OBJ)/$(NAME).typ: $(SRC_INPUTS) $(TEMPLATE) template/spec.typ $(REV_PREREQ) | check-versions
-	@mkdir -p "$(OBJ)"
-	sh scripts/lint.sh $(SRC_INPUTS) && \
-	pandoc \
-		--from markdown \
-		--to typst \
-		--standalone \
-		--template "$(TEMPLATE)" \
-		$(METADATA_FLAG) \
-		-o "$@" \
-		$(SRC_INPUTS)
-
-$(BUILD)/$(NAME).pdf: $(OBJ)/$(NAME).typ $(FONTS) $(HIGHLIGHT_THEME) $(DIAGRAM_SVGS)
-	typst compile \
-		--root . \
-		--font-path "$(FONT_DIR)" \
-		--ignore-system-fonts \
-		"$(OBJ)/$(NAME).typ" \
-		"$(BUILD)/$(NAME).pdf"
+pdf: validate docker-build
+	@mkdir -p "$(BUILD)"
+	$(DOCKER_RUN) $(CONTAINER_ENV) $(DOCKER_FULLTAG) sh scripts/container-build.sh
 
 # TYPST_SHA256 / ALLOW_UNVERIFIED は指定時のみ --build-arg で渡す(空文字を
 # 渡すと Dockerfile の既定 sha256 を潰すため)。ALLOW_UNVERIFIED=1 単独指定時
@@ -255,74 +154,30 @@ docker-build:
 		$(if $(TYPST_SHA256),--build-arg TYPST_SHA256=$(TYPST_SHA256),$(if $(ALLOW_UNVERIFIED),--build-arg TYPST_SHA256= --build-arg ALLOW_UNVERIFIED=$(ALLOW_UNVERIFIED))) \
 		-t $(DOCKER_FULLTAG) -t $(DOCKER_IMAGE):latest .
 
-pdf-docker: docker-build
-	$(validate-src)
+# 執筆中の自動リビルド。コンテナ内で container-build.sh が watch モードで
+# 動き続ける(仕組みはスクリプト側のコメント参照)。リポジトリはマウントで
+# 共有されるため、ホスト側エディタでの編集がそのまま検知される。
+# --init: Ctrl-C(SIGINT)をコンテナ内の sh へ確実に届けるため。
+# -it: 対話端末前提(watch は CI では使わない)。
+watch: validate docker-build
 	@mkdir -p "$(BUILD)"
-	docker run --rm --user $$(id -u):$$(id -g) -v "$(CURDIR)":/work -w /work $(DOCKER_FULLTAG) \
-		sh -c '\
-			mkdir -p "$(OBJ)" && \
-			sh scripts/lint.sh $(SRC_INPUTS) && \
-			$(REV_CONVERT) && \
-			if [ -n "$(strip $(DIAGRAM_PUMLS))" ]; then \
-				for p in $(DIAGRAM_PUMLS); do \
-					sh scripts/puml2svg.sh "$$p" "$(DIAGRAM_OUT)/$$(basename "$$p" .puml).svg" || exit 1; \
-				done; \
-			fi && \
-			pandoc --from markdown --to typst --standalone --template "$(TEMPLATE)" $(METADATA_FLAG) -o "$(OBJ)/$(NAME).typ" $(SRC_INPUTS) && \
-			typst compile --root . --font-path "$(FONT_DIR)" --ignore-system-fonts "$(OBJ)/$(NAME).typ" "$(BUILD)/$(NAME).pdf" \
-		'
+	@echo "watch: $(SRC) の変更を監視します(Ctrl-C で終了)"
+	$(DOCKER_RUN) --init -it -e WATCH=1 $(CONTAINER_ENV) $(DOCKER_FULLTAG) sh scripts/container-build.sh
 
-# 執筆中の自動リビルド: 初回ビルド(pdf)→ typst watch をバックグラウンド起動
-# → $(SRC_INPUTS)(+改訂履歴ファイル+参照中の図の .puml と plantuml.config)
-# を 1 秒間隔でポーリングし、変更検知で lint → YAML 変換 → 図の再変換 →
-# pandoc を再実行する(.typ の再生成は typst watch が拾って PDF に反映する)。
-# 図の再変換はサブ make(diagrams ターゲット)で行う: mtime 比較で変更分だけ
-# を変換でき、Markdown に新しく追加された図の参照も DIAGRAM_SVGS の再評価で
-# 拾える(ただし新規参照に対応する .puml 自体はポーリング対象に入らないため、
-# その後の編集を検知するには watch の再起動が必要)。POSIX sh のみで実装
-# (mtime 比較は `find -newer` + スタンプファイル)。lint / 変換 / pandoc の
-# エラーでは停止せず監視を継続する。Ctrl-C で typst watch ごと終了する。
-# SRC の検証は prerequisite の pdf 側で実施済み。
-watch: pdf
-	@stamp="$(OBJ)/.watch-stamp-$(NAME)"; \
-	touch "$$stamp"; \
-	typst watch \
-		--root . \
-		--font-path "$(FONT_DIR)" \
-		--ignore-system-fonts \
-		"$(OBJ)/$(NAME).typ" \
-		"$(BUILD)/$(NAME).pdf" & \
-	watch_pid=$$!; \
-	trap 'echo "watch: 終了します(typst watch を停止します)"; kill $$watch_pid 2>/dev/null; wait $$watch_pid 2>/dev/null; exit 0' INT TERM; \
-	echo "watch: $(SRC) の変更を監視しています(Ctrl-C で終了)"; \
-	while :; do \
-		if ! kill -0 $$watch_pid 2>/dev/null; then \
-			echo "ERROR: typst watch が終了しました(ログを確認してください)" >&2; \
-			exit 1; \
-		fi; \
-		changed=$$(find $(SRC_INPUTS) $(REV_WATCH) $(DIAGRAM_PUMLS) $(PLANTUML_CONFIG) -newer "$$stamp" 2>/dev/null); \
-		if [ -n "$$changed" ]; then \
-			touch "$$stamp"; \
-			if sh scripts/lint.sh $(SRC_INPUTS); then \
-				if $(REV_CONVERT); then \
-					if $(MAKE) --no-print-directory -s SRC="$(SRC)" PLANTUML="$(PLANTUML)" diagrams; then \
-						if pandoc --from markdown --to typst --standalone --template "$(TEMPLATE)" $(METADATA_FLAG) -o "$(OBJ)/$(NAME).typ" $(SRC_INPUTS); then \
-							echo "watch: 再生成しました($(OBJ)/$(NAME).typ) -- typst watch が自動で再コンパイルします"; \
-						else \
-							echo "WARNING: pandoc の変換に失敗しました(watch は継続します。修正して保存すると再試行します)" >&2; \
-						fi; \
-					else \
-						echo "WARNING: PlantUML 図の変換に失敗しました(watch は継続します。修正して保存すると再試行します)" >&2; \
-					fi; \
-				else \
-					echo "WARNING: 改訂履歴($(REV_MD))の YAML 変換に失敗しました(watch は継続します。修正して保存すると再試行します)" >&2; \
-				fi; \
-			else \
-				echo "WARNING: lint エラーのため再ビルドをスキップしました(watch は継続します。修正して保存すると再試行します)" >&2; \
-			fi; \
-		fi; \
-		sleep 1; \
-	done
+# 簡易 lint(scripts/lint.sh)。見出しの手動採番などを検知する。
+# `make lint` 単体は docs/ と examples/ の Markdown 全件を対象にする。
+lint:
+	@sh scripts/lint.sh
+
+# ビルド対象の SRC だけを lint する補助ターゲット(コンテナ内のビルドでも
+# 同じ lint が pandoc の前に実行される)。
+lint-src:
+	@sh scripts/lint.sh $(SRC_INPUTS)
+
+# scripts/lint.sh 自体の回帰テスト(検出すべき違反を検出し、正常な原稿を
+# 誤検知しないことをサンドボックス上のフィクスチャで検証する)。
+test:
+	@sh scripts/test-lint.sh
 
 clean:
 	rm -rf $(BUILD)
