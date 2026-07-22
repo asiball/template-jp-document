@@ -16,7 +16,7 @@
 set -eu
 
 if [ "$#" -ne 1 ]; then
-	echo "usage: sh scripts/revisions-md2yaml.sh docs/<name>.revisions.md > build/<name>.revisions.yaml" >&2
+	echo "usage: sh scripts/revisions-md2yaml.sh docs/<name>.revisions.md > build/obj/<name>.revisions.yaml" >&2
 	exit 2
 fi
 

@@ -138,7 +138,7 @@ docker build --build-arg PANDOC_IMAGE=pandoc/core@sha256:<digest> -t jp-spec-bui
 
 **著作権表示について**: `LICENSE-SourceHanCodeJP.txt` に著作権表示ブロックが無いこと、`LICENSE-SourceHanSerif.txt` の著作権年がフォント実体の name テーブルの年と一致しないことは、いずれも上流リポジトリの `LICENSE.txt` 由来であり、本リポジトリで手を加えたものではありません(著作権表示自体は各フォントの OpenType name テーブルに記載されています)。
 
-**注意(重要)**: `Source Han Code JP` のファイル内部の正式なファミリー名(OpenType name テーブル)は、見かけ上は `Source Han Code JP` ですが、Typst のフォントマッチングでは `Source Han Code JP R` を指定しないと解決できません(`R`/`B` が weight として自動分離されないため)。同様に `Source Han Sans JP Medium` は `Source Han Sans JP`(ファミリー名からウェイト語が自動的に取り除かれる)として解決されます。フォントを差し替える際は、`fontTools` などで name テーブルを確認し、`template/spec.typ` 冒頭の `font-serif` / `font-sans` / `font-code` の値を実際に解決できるファミリー名に合わせて修正してください。
+**注意(重要)**: `SourceHanCodeJP-*.otf` の OpenType name テーブル上のファミリー名は `Source Han Code JP` ですが、Typst のフォントマッチングでは `Source Han Code JP R` を指定しないと解決できません(末尾の `R`/`B` が weight として自動分離されないため)。同様に `Source Han Sans JP Medium` は `Source Han Sans JP`(ファミリー名からウェイト語が自動的に取り除かれる)として解決されます。フォントを差し替える際は、`fontTools` などで name テーブルを確認し、`template/spec.typ` 冒頭の `font-serif` / `font-sans` / `font-code` の値を実際に解決できるファミリー名に合わせて修正してください。
 
 ### 別フォントへの差し替え手順(例: UDEV Gothic など)
 
