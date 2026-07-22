@@ -42,6 +42,32 @@ make pdf SRC=docs/my-spec.md
 - 美観に関する定義はすべて `template/spec.typ` に一元化されています。デザインを変えたいときはこのファイルだけを見ればよい、という状態を保つのがこのテンプレートの目的です。
 - Markdown 標準の記法では表現できないもの(セル結合を伴う表など)に限り、Pandoc の生 Typst 記法(エスケープハッチ)を使うことを許容します。
 
+ビルドの流れ(すべて Docker コンテナ内で実行されます):
+
+```mermaid
+flowchart LR
+    subgraph repo["原稿とテーマ(Git 管理)"]
+        MD["Markdown<br/>(構造のみ)"]
+        REV["改訂履歴<br/>revisions.md"]
+        PUML["図のソース<br/>assets/diagrams/*.puml"]
+        SPEC["template/spec.typ<br/>(見た目の定義)"]
+    end
+    subgraph docker["Docker コンテナ(ツールチェーンとフォントを固定バージョンで同梱)"]
+        PANDOC["pandoc"]
+        PLANTUML["plantuml"]
+        TYPST["typst"]
+    end
+    PDF["build/#lt;name#gt;.pdf"]
+
+    MD --> PANDOC
+    REV --> PANDOC
+    PUML --> PLANTUML
+    PANDOC -- ".typ(構造)" --> TYPST
+    SPEC -- "show/set ルール(見た目)" --> TYPST
+    PLANTUML -- "SVG" --> TYPST
+    TYPST --> PDF
+```
+
 なぜこの構成か: Pandoc は Markdown の構造解析と柔軟な形式変換に強く、Typst は組版(段組・見出し番号・和文禁則・シンタックスハイライト)に強い、という役割分担です。LaTeX と比べて Typst はビルドが高速で、テーマ定義が素直な関数ベースの Typst コードで書けるため、体裁の一元管理と保守がしやすくなっています。
 
 ## ディレクトリ構成
