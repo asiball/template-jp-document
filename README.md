@@ -199,7 +199,7 @@ PlantUML で書ける図は、**ソース(`.puml`)だけを Git 管理し、SVG 
 
 運用上のポイント:
 
-- **エディタの Markdown プレビューでも図を表示できます**。参照先が実在の SVG になるため、一度 `make pdf`(または `make watch` を常駐)すれば、ルート絶対パスをワークスペースルート基準で解決するプレビュー(VS Code 標準の Markdown プレビューなど)で図がインライン表示されます。`make watch` 中は `.puml` を保存するたびに SVG が更新されるので、プレビューも追随します。clone 直後や `make clean` 直後はビルドするまで図が表示されません(壊れた画像アイコンになりますが異常ではありません)。
+- **エディタの Markdown プレビューでも図を表示できます**。参照先が実在の SVG になるため、一度 `make pdf`(または `make watch` を常駐)すれば、ルート絶対パスをワークスペースルート基準で解決するプレビュー(VS Code 標準の Markdown プレビューなど)で図がインライン表示されます。`make watch` 中は `.puml` を保存するたびに SVG が更新されます(プレビューへの反映は、Markdown 側の編集・保存などプレビューが再描画されるタイミングです)。clone 直後や `make clean` 直後はビルドするまで図が表示されません(壊れた画像アイコンになりますが異常ではありません)。なお、図の執筆中のフィードバックには PlantUML 拡張(jebbs.plantuml)による `.puml` のサイドプレビューが便利です。
 - **図中テキストのフォントは本文と同じ同梱フォント(Source Han Sans JP)に統一されます**。`template/plantuml.config` が全図に共通適用されるためで、SVG 内のテキストは Typst が `assets/fonts/` から解決して描画します。図の見た目に関する共通設定を増やしたい場合もこのファイルに書きます(個々の図固有の設定は各 `.puml` に書いてかまいません)。
 - **参照は `/build/diagrams/<name>.svg` 形式(ルート絶対パス)で書いてください**。`.puml` の直接参照・相対パス参照・対応する `.puml` が存在しない参照は、`scripts/lint.sh` がエラーでビルドを停止します。
 - **ローカルの `make pdf` には plantuml が必要です**(例: `brew install plantuml`。jar を直接使う場合は `make pdf PLANTUML='java -jar /path/to/plantuml.jar'`)。ただし必要になるのは PlantUML 図を参照している文書のビルドだけで、図を使わない文書は plantuml なしでビルドできます。`make pdf-docker` はイメージに固定バージョンの PlantUML を同梱しているため、インストール不要です(バージョン・チェックサム検証は [BUILDING.md](BUILDING.md) 参照)。
