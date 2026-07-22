@@ -54,12 +54,15 @@ ARG PLANTUML_VERSION=1.2026.6
 ARG PLANTUML_SHA256="e620ae095a2ba0134d3c33fd5ae34ff01e785f3df1796c0898802b8761a033a8"
 
 RUN set -eu; \
+	# JRE は headless 版ではなく通常版を使う: Alpine の openjdk21-jre-headless
+	# には libfontmanager.so が含まれず、PlantUML のフォント計測(AWT)が
+	# UnsatisfiedLinkError で失敗する。
 	# graphviz はシーケンス図以外(クラス図・状態遷移図等)のレイアウトに必要。
 	# fontconfig + /work/assets/fonts の登録は、実行時にマウントされる同梱
 	# フォントを PlantUML(Java)から見えるようにするため: 図中テキストの幅
 	# 計測を PDF 描画と同じフォントで行わないと、ラベル幅と箱のサイズが
 	# ずれることがある(ttf-dejavu は欧文のフォールバック)。
-	apk add --no-cache openjdk21-jre-headless graphviz fontconfig ttf-dejavu curl; \
+	apk add --no-cache openjdk21-jre graphviz fontconfig ttf-dejavu curl; \
 	curl -fsSL -o /opt/plantuml.jar "https://repo1.maven.org/maven2/net/sourceforge/plantuml/plantuml/${PLANTUML_VERSION}/plantuml-${PLANTUML_VERSION}.jar"; \
 	echo "${PLANTUML_SHA256}  /opt/plantuml.jar" | sha256sum -c -; \
 	printf '#!/bin/sh\nexec java -Djava.awt.headless=true -jar /opt/plantuml.jar "$@"\n' > /usr/local/bin/plantuml; \
