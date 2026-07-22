@@ -17,6 +17,10 @@
 #     前方を上書きし、00-meta.md の title 等が消えるため)
 #   - 見出しの手動採番: `# 1. foo` / `## 2) foo` / `# 第1章 foo` / `# 1章 foo`
 #     (Typst の自動採番と二重になるため。全ファイルが対象)
+#   - PlantUML 参照の不備: .puml の直接画像参照(変換後の SVG を参照する
+#     規約)、/build/diagrams/<name>.svg 形式(ルート絶対パス)でない図の
+#     参照、参照 SVG に対応する assets/diagrams/<name>.puml の不存在
+#     (いずれもビルド後半で分かりにくいエラーになるため早期に止める)
 #
 # 警告(exit 0。ビルドは継続):
 #   - 見出しが数字で始まる(`## 2.5 系` 等。手動採番の疑いがあるだけの場合)
@@ -166,6 +170,32 @@ for f in "$@"; do
 				;;
 		esac
 
+		# --- PlantUML 参照のチェック ---
+		case "$line" in
+			*']('*'.puml'*|*']('*'build/diagrams/'*)
+				target=$(printf '%s' "$line" | sed -n -E 's/.*\]\(([^) ]+)[^)]*\).*/\1/p')
+				if [ -n "$target" ]; then
+					case "$target" in
+						*.puml)
+							echo "ERROR: $f:$lineno: .puml を直接画像参照することはできません: $target(変換後の /build/diagrams/<name>.svg を参照し、ソースを assets/diagrams/<name>.puml に置いてください。README の「図の挿入」参照)。" >&2
+							found_error=1
+							;;
+						/build/diagrams/*.svg)
+							puml="assets/diagrams/$(basename "$target" .svg).puml"
+							if [ ! -f "$puml" ]; then
+								echo "ERROR: $f:$lineno: 参照 $target に対応する PlantUML ソースが存在しません: $puml を置いてください。" >&2
+								found_error=1
+							fi
+							;;
+						*build/diagrams/*)
+							echo "ERROR: $f:$lineno: PlantUML 変換図の参照は /build/diagrams/<name>.svg 形式(リポジトリルートからの絶対パス)で書いてください: $target" >&2
+							found_error=1
+							;;
+					esac
+				fi
+				;;
+		esac
+
 		# --- 脚注定義 ID の収集(章別ファイル分割時の重複検出用) ---
 		if [ "$is_chapter_mode" -eq 1 ]; then
 			case "$line" in
@@ -204,7 +234,7 @@ for accum in "$tmp"/footnotes-*.txt; do
 done
 
 if [ "$found_error" -eq 1 ]; then
-	echo "lint: 見出しの手動採番エラー・フロントマターの不備・章ファイルへのフロントマター混入のいずれかが見つかりました。上記の該当行を修正してください。" >&2
+	echo "lint: 見出しの手動採番エラー・フロントマターの不備・章ファイルへのフロントマター混入・PlantUML 参照の不備のいずれかが見つかりました。上記の該当行を修正してください。" >&2
 	exit 1
 fi
 

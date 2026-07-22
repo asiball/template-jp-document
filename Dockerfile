@@ -2,8 +2,9 @@
 # Dockerfile — 決定的なビルド環境(`make pdf-docker` が使用する「正」の環境)
 #
 # pandoc はベースイメージ同梱のものを使い、Typst は GitHub Releases の musl
-# 静的ビルドを固定バージョンで導入する。フォントはイメージに焼き込まず、
-# 実行時にマウントした assets/fonts を --font-path で参照する。
+# 静的ビルドを、PlantUML は Maven Central の jar を、それぞれ固定バージョン+
+# チェックサム検証で導入する。フォントはイメージに焼き込まず、実行時に
+# マウントした assets/fonts を --font-path で参照する。
 # =============================================================================
 
 # タグ固定(digest 固定が必要な場合は BUILDING.md の手順で PANDOC_IMAGE を上書き)。
@@ -44,6 +45,30 @@ RUN set -eu; \
 	install -m 0755 "/tmp/typst-extract/typst-${TYPST_ARCH}/typst" /usr/local/bin/typst; \
 	rm -rf /tmp/typst.tar.xz /tmp/typst-extract; \
 	apk del curl xz
+
+# PlantUML(Markdown から参照する .puml の SVG 変換に使用。README の「図の
+# 挿入」節参照)。Maven Central の jar はアーキテクチャ非依存・イミュータブル
+# なので、バージョンと sha256 の固定だけで決定的に導入できる。変更時は
+# Makefile の EXPECTED_PLANTUML も揃えること。
+ARG PLANTUML_VERSION=1.2026.6
+ARG PLANTUML_SHA256="e620ae095a2ba0134d3c33fd5ae34ff01e785f3df1796c0898802b8761a033a8"
+
+RUN set -eu; \
+	# JRE は headless 版ではなく通常版を使う: Alpine の openjdk21-jre-headless
+	# には libfontmanager.so が含まれず、PlantUML のフォント計測(AWT)が
+	# UnsatisfiedLinkError で失敗する。
+	# graphviz はシーケンス図以外(クラス図・状態遷移図等)のレイアウトに必要。
+	# fontconfig + /work/assets/fonts の登録は、実行時にマウントされる同梱
+	# フォントを PlantUML(Java)から見えるようにするため: 図中テキストの幅
+	# 計測を PDF 描画と同じフォントで行わないと、ラベル幅と箱のサイズが
+	# ずれることがある(ttf-dejavu は欧文のフォールバック)。
+	apk add --no-cache openjdk21-jre graphviz fontconfig ttf-dejavu curl; \
+	curl -fsSL -o /opt/plantuml.jar "https://repo1.maven.org/maven2/net/sourceforge/plantuml/plantuml/${PLANTUML_VERSION}/plantuml-${PLANTUML_VERSION}.jar"; \
+	echo "${PLANTUML_SHA256}  /opt/plantuml.jar" | sha256sum -c -; \
+	printf '#!/bin/sh\nexec java -Djava.awt.headless=true -jar /opt/plantuml.jar "$@"\n' > /usr/local/bin/plantuml; \
+	chmod 0755 /usr/local/bin/plantuml; \
+	printf '<?xml version="1.0"?>\n<!DOCTYPE fontconfig SYSTEM "fonts.dtd">\n<fontconfig><dir>/work/assets/fonts</dir></fontconfig>\n' > /etc/fonts/conf.d/60-work-assets-fonts.conf; \
+	apk del curl
 
 WORKDIR /work
 
