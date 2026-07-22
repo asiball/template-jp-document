@@ -16,7 +16,7 @@ make test                     # scripts/lint.sh 自体の回帰テスト(scripts
 make clean                    # build/ を削除
 ```
 
-ビルドはすべて Docker コンテナ内で実行される(pandoc / typst / plantuml とフォントはイメージ内に固定バージョン+チェックサム検証で導入。ローカルへのインストールは不要で、Docker と make だけが必要)。ツールチェーンやフォントの固定バージョンを変更したときは、`Makefile` の `DOCKER_TAG` を上げること(利用者側の次回ビルドでイメージ再構築が自動で走るようにするため)。`make pdf` は次の順で実行されます(検証は `Makefile`、ビルド本体はコンテナ内の `scripts/container-build.sh`)。
+ビルドはすべて Docker コンテナ内で実行される(pandoc / typst / plantuml とフォントはイメージ内に固定バージョン+チェックサム検証で導入。ローカルへのインストールは不要で、Docker と make だけが必要)。`Makefile` の `DOCKER_TAG` は `Dockerfile` の内容(+検証系オーバーライド)から自動導出される内容ハッシュのため、ツールチェーンやフォントの固定バージョンを変更しても手動でバンプする必要はない(`Dockerfile` を変更すれば自動的に別タグになり、利用者側の次回ビルドで再構築が走る)。`make pdf` は次の順で実行されます(検証は `Makefile`、ビルド本体はコンテナ内の `scripts/container-build.sh`)。
 
 1. `SRC` の存在確認(章別ファイル分割の場合は `00-meta.md` と章ファイルの有無、参照図に対応する `.puml` の有無)と改訂履歴ファイルの併存チェックを行い、続けて Docker イメージを用意する(未構築・ツールチェーン変更時のみ実体の構築が走る)。
 2. `scripts/lint.sh` でビルド対象の Markdown を簡易チェックする(`make lint` は docs/ と examples/ の `*.md` 全件 + 章別ファイル分割ディレクトリすべてが対象。ただし改訂履歴ファイル `*.revisions.md` / `<name>/revisions.md` は仕様書本文ではないため lint.sh 側で除外される。`.revisions.yaml` / `revisions.yaml` も対象外)。

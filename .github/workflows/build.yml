@@ -12,6 +12,11 @@
 #     による検出漏れ・誤検知をビルド前に検知する)
 # 生成した PDF はアーティファクトとして保存し、PR 上で見た目を確認できる。
 #
+# Docker イメージは actions/cache でキャッシュする(キー = Dockerfile の
+# ハッシュ)。Makefile の DOCKER_TAG も同じ Dockerfile 内容ハッシュから
+# 導出されるため、キャッシュがヒットしてイメージを読み込めれば
+# make pdf 内の docker-build はイメージ存在チェックにより再構築をスキップする。
+#
 # main への push では実行しない(マージされる内容は直前の PR の実行で検証済み
 # のため重複になる)。main を直接検証したい場合は workflow_dispatch で手動実行
 # できる。
@@ -36,19 +41,38 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Cache Docker image
+        id: image-cache
+        uses: actions/cache@v4
+        with:
+          path: /tmp/jp-spec-builder.tar
+          key: docker-image-${{ hashFiles('Dockerfile') }}
+
+      - name: Load cached image
+        run: |
+          if [ -f /tmp/jp-spec-builder.tar ]; then
+            docker load -i /tmp/jp-spec-builder.tar
+          fi
+
       - name: Test(scripts/lint.sh の回帰テスト)
         run: make test
 
       - name: Lint(docs / examples 全件)
         run: make lint
 
-      # 1 回目の make pdf が docker-build(イメージ構築)を含む。
-      # 2 回目以降はレイヤーキャッシュが効くためイメージ構築は一瞬で済む。
+      # イメージキャッシュがヒットしていれば、1 回目の make pdf の
+      # docker-build はイメージ存在チェックにより再構築をスキップする。
+      # ミス時は 1 回目の make pdf でイメージを構築し、2 回目以降は
+      # 同じイメージを使い回す。
       - name: Build sample-spec(章別ファイル分割)
         run: make pdf
 
       - name: Build wareki-api-spec(単一ファイル + 改訂履歴別ファイル)
         run: make pdf SRC=examples/wareki-api-spec.md
+
+      - name: Save image for cache
+        if: steps.image-cache.outputs.cache-hit != 'true'
+        run: docker save -o /tmp/jp-spec-builder.tar jp-spec-builder
 
       - name: Upload PDFs
         uses: actions/upload-artifact@v4

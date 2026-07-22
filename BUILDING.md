@@ -4,7 +4,7 @@
 
 ## ビルドの仕組み
 
-すべてのビルド(`make pdf` / `make watch`)は Docker コンテナ内で実行されます。必要なのは Docker と make のみで、pandoc / typst / plantuml / フォントをローカルへインストールする必要はありません。イメージは初回の `make pdf` で自動構築されます(ツールチェーンを変更した場合は `Makefile` の `DOCKER_TAG` が上がるため、更新後の初回も自動で再構築されます)。
+すべてのビルド(`make pdf` / `make watch`)は Docker コンテナ内で実行されます。必要なのは Docker と make のみで、pandoc / typst / plantuml / フォントをローカルへインストールする必要はありません。イメージは初回の `make pdf` で自動構築されます。`Makefile` の `DOCKER_TAG` は `Dockerfile` の内容(+検証系オーバーライド)から自動導出される内容ハッシュのため、ツールチェーンを変更した場合も手動でバンプする必要はなく、変更後の初回ビルドで自動的に別タグとして再構築されます(タグが変わらない限り、既存イメージが再利用され再構築はスキップされます)。
 
 `docker run` には `--user $(id -u):$(id -g)` を付与しているため、`build/` 配下に生成されるファイルはホスト側の実行ユーザー所有になります(コンテナ内で root 所有になる問題を避けるため)。
 
@@ -19,20 +19,22 @@
 | plantuml | 1.2026.6 | Maven Central の jar(sha256 検証) |
 | フォント | 下記「フォント」節の表 | Adobe 公式リポジトリのリリースタグ(sha256 検証) |
 
-バージョンが異なると、見出し番号の折り返しや表の罫線など細部のレンダリングが変わる可能性があります。バージョンを上げる場合は、`Dockerfile` の該当値と `Makefile` の `DOCKER_TAG` をあわせて更新し、CI のビルド結果(生成 PDF のアーティファクト)で見た目の回帰を確認してください。
+バージョンが異なると、見出し番号の折り返しや表の罫線など細部のレンダリングが変わる可能性があります。バージョンを上げる場合は `Dockerfile` の該当値を更新してください(`Makefile` の `DOCKER_TAG` は `Dockerfile` の内容ハッシュのため自動的に別タグになり、手動更新は不要です)。CI のビルド結果(生成 PDF のアーティファクト)で見た目の回帰を確認してください。
 
 ### Typst バイナリのチェックサム検証
 
-`Dockerfile` は Typst の実行バイナリを GitHub Releases から取得し、`Dockerfile` に焼き込み済みの sha256(既定の `TYPST_VERSION` / `TYPST_ARCH` 用)で必ず検証します。ダウンロードしたバイナリが一致しない場合(改ざん・破損・バージョン不一致)はビルドが**エラーで停止**します。通常の `make pdf` では何も指定する必要はありません。
+`Dockerfile` は Typst の実行バイナリを GitHub Releases から取得し、sha256 で必ず検証します。ダウンロードしたバイナリが一致しない場合(改ざん・破損・バージョン不一致)はビルドが**エラーで停止**します。
 
-同梱の `Dockerfile` がダウンロードする Typst バイナリは既定で x86_64(Linux, musl 静的ビルド)向けです。Apple Silicon などの別アーキテクチャ上でビルドする場合は `TYPST_ARCH` ビルド引数で差し替え、あわせて対応する `TYPST_SHA256` も指定してください(例: `docker build --build-arg TYPST_ARCH=aarch64-unknown-linux-musl --build-arg TYPST_SHA256=<対応するsha256> .`)。
+`TYPST_ARCH` を指定しない場合、`Dockerfile` は `RUN` 内で `uname -m` からアーキテクチャを自動判定します(`x86_64` → `x86_64-unknown-linux-musl`、`aarch64` / `arm64` → `aarch64-unknown-linux-musl`)。この 2 アーキテクチャには既定の sha256(`TYPST_SHA256_X86_64` / `TYPST_SHA256_AARCH64`)が `Dockerfile` に焼き込み済みのため、x86_64 でも Apple Silicon 等の aarch64 でも `make pdf` で何も指定する必要はありません。
 
-参考: v0.15.0 の musl 静的ビルドの sha256(GitHub Releases のアセットダイジェスト):
+それ以外のアーキテクチャ、または自動判定を上書きしたい場合は `TYPST_ARCH` ビルド引数を明示指定してください。焼き込み値がないアーキテクチャの場合は対応する `TYPST_SHA256` もあわせて必要です(例: `docker build --build-arg TYPST_ARCH=<対応するターゲット triple> --build-arg TYPST_SHA256=<対応するsha256> .`)。
+
+参考: v0.15.0 の musl 静的ビルドの sha256(GitHub Releases のアセットダイジェスト。`Dockerfile` の焼き込み値と一致):
 
 | アーキテクチャ | sha256 |
 |---|---|
-| `x86_64-unknown-linux-musl`(既定。`Dockerfile` に設定済み) | `59b207df01be2dab9f13e80f73d04d7ff8273ffd46b3dd1b9eef5c60f3eeabea` |
-| `aarch64-unknown-linux-musl` | `cdf50ffc7b8ba759ed02200632eda3d78eb8b99aacb6611f4f75684990647620` |
+| `x86_64-unknown-linux-musl`(自動判定対象。`Dockerfile` に設定済み) | `59b207df01be2dab9f13e80f73d04d7ff8273ffd46b3dd1b9eef5c60f3eeabea` |
+| `aarch64-unknown-linux-musl`(自動判定対象。`Dockerfile` に設定済み) | `cdf50ffc7b8ba759ed02200632eda3d78eb8b99aacb6611f4f75684990647620` |
 
 sha256 の取得方法(ワンライナー。URL のバージョン・アーキテクチャは適宜読み替え):
 
@@ -106,7 +108,7 @@ docker build --build-arg PANDOC_IMAGE=pandoc/core@sha256:<digest> -t jp-spec-bui
 1. `Dockerfile` のフォント導入レイヤーの一覧(URL と sha256)を、新しいフォントの取得先に差し替える。ライセンス文書の取得もあわせて差し替える(Web 配布されていないフォントを使う場合は、取得の代わりに `COPY` で `/opt/fonts` へ配置する形に変えてもよい)。
 2. `fontTools` 等で正しいファミリー名を確認する(`Source Han Code JP` の例のように、見かけと実際の解決名が異なることがあるため、必ず実際にコンパイルして確認すること)。
 3. `template/spec.typ` 冒頭の `font-serif` / `font-sans` / `font-code` を新しいファミリー名に書き換える。PlantUML 図を使っている場合は `template/plantuml.config` の `defaultFontName` もあわせて書き換える(図中テキストも Typst が同じ仕組みでフォント解決するため)。
-4. `Makefile` の `DOCKER_TAG` を上げてから `make pdf` を実行し、`Typst warning: unknown font family: ...` が出ないことを確認する(PlantUML 図がある場合は図中テキストの描画も確認する)。
+4. `make pdf` を実行し、`Typst warning: unknown font family: ...` が出ないことを確認する(`Makefile` の `DOCKER_TAG` は `Dockerfile` の内容ハッシュのため、`Dockerfile` を変更した時点で自動的に再構築される。PlantUML 図がある場合は図中テキストの描画も確認する)。
 
 ## ビルドの決定性について
 
