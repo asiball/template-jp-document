@@ -303,6 +303,55 @@ write docs/fenced.md <<-'EOF'
 	EOF
 expect_ok docs/fenced.md
 
+new_case "4 バッククォートのフェンス内は内側の 3 バッククォートがあっても検査しない"
+write docs/fenced4.md <<-'EOF'
+	---
+	title: テスト仕様書
+	---
+
+	# はじめに
+
+	````markdown
+	```
+	# 1. 手動採番
+	```
+	````
+	EOF
+expect_ok docs/fenced4.md
+
+new_case "4 バッククォートのフェンスの閉じ後は検査される"
+write docs/fenced4-closed.md <<-'EOF'
+	---
+	title: テスト仕様書
+	---
+
+	# はじめに
+
+	````markdown
+	```
+	内側の行
+	```
+	````
+
+	# 1. 手動採番
+	EOF
+expect_error "見出しに手動採番が付与されています" docs/fenced4-closed.md
+
+new_case "チルダフェンス内のバッククォート行ではフェンスが閉じない"
+write docs/tilde-with-backtick.md <<-'EOF'
+	---
+	title: テスト仕様書
+	---
+
+	# はじめに
+
+	~~~markdown
+	```
+	# 1. 手動採番
+	~~~
+	EOF
+expect_ok docs/tilde-with-backtick.md
+
 # --- PlantUML 参照 ----------------------------------------------------------
 
 new_case ".puml の直接画像参照はエラー"
@@ -367,6 +416,21 @@ write docs/fenced-diagram.md <<-'EOF'
 	```
 	EOF
 expect_ok docs/fenced-diagram.md
+
+new_case "1 行に複数の図参照があってもすべて検査される"
+write docs/multi-ref.md <<-'EOF'
+	---
+	title: テスト仕様書
+	---
+
+	![a](/build/diagrams/seq.svg) と ![b](/assets/diagrams/foo.puml)
+	EOF
+write assets/diagrams/seq.puml <<-'EOF'
+	@startuml
+	A -> B
+	@enduml
+	EOF
+expect_error ".puml を直接画像参照することはできません" docs/multi-ref.md
 
 # --- 生 Typst ブロック ------------------------------------------------------
 

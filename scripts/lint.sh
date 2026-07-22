@@ -117,24 +117,44 @@ for f in "$@"; do
 	in_fence=0
 	fence_lang=""
 	fence_marker=""
+	fence_len=0
 	lineno=0
 
 	while IFS= read -r line || [ -n "$line" ]; do
 		lineno=$((lineno + 1))
 
 		case "$line" in
-			'```'*|'~~~'*)
-				marker=$(printf '%s' "$line" | cut -c1-3)
-				if [ "$in_fence" -eq 0 ]; then
-					in_fence=1
-					fence_marker="$marker"
-					fence_lang=$(printf '%s' "$line" | sed -E 's/^(```|~~~)//')
-					continue
-				elif [ "$marker" = "$fence_marker" ]; then
-					in_fence=0
-					fence_lang=""
-					fence_marker=""
-					continue
+			'`'*|'~'*)
+				# CommonMark はフェンス文字の行頭連続数(run 長)で開始・終了を
+				# 判定する。4 バッククォート以上のフェンス内に ``` が現れても
+				# 誤って閉じないよう、run 長を実際に数える必要がある(run<3 は
+				# インラインコード等でありフェンスではないので何もしない)。
+				fchar=${line%"${line#?}"}
+				rest=$line
+				run=0
+				while [ "${rest#"$fchar"}" != "$rest" ]; do
+					run=$((run + 1))
+					rest=${rest#"$fchar"}
+				done
+				if [ "$run" -ge 3 ]; then
+					if [ "$in_fence" -eq 0 ]; then
+						in_fence=1
+						fence_marker="$fchar"
+						fence_len="$run"
+						fence_lang="$rest"
+						continue
+					fi
+					# フェンス内: 同じ文字・run 長が開始時以上・後続が空白のみ
+					# (info 文字列なし)の行だけが閉じフェンスになる。それ以外
+					# はフェンス内容として下の in_fence ブロックに処理させる。
+					trailing=$(printf '%s' "$rest" | sed -E 's/[[:space:]]//g')
+					if [ "$fchar" = "$fence_marker" ] && [ "$run" -ge "$fence_len" ] && [ -z "$trailing" ]; then
+						in_fence=0
+						fence_lang=""
+						fence_marker=""
+						fence_len=0
+						continue
+					fi
 				fi
 				;;
 		esac
@@ -171,11 +191,14 @@ for f in "$@"; do
 				;;
 		esac
 
-		# --- PlantUML 参照のチェック ---
+		# --- PlantUML 参照のチェック(1 行に複数の画像参照があってもすべて検査する) ---
 		case "$line" in
-			*']('*'.puml'*|*']('*'build/diagrams/'*)
-				target=$(printf '%s' "$line" | sed -n -E 's/.*\]\(([^) ]+)[^)]*\).*/\1/p')
-				if [ -n "$target" ]; then
+			*']('*)
+				scan=$line
+				while [ "${scan#*']('}" != "$scan" ]; do
+					scan=${scan#*']('}
+					target=${scan%%\)*}
+					target=${target%% *}
 					case "$target" in
 						*.puml)
 							echo "ERROR: $f:$lineno: .puml を直接画像参照することはできません: $target(変換後の /build/diagrams/<name>.svg を参照し、ソースを assets/diagrams/<name>.puml に置いてください。README の「図の挿入」参照)。" >&2
@@ -193,7 +216,7 @@ for f in "$@"; do
 							found_error=1
 							;;
 					esac
-				fi
+				done
 				;;
 		esac
 

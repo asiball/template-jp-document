@@ -17,15 +17,34 @@
 set -eu
 
 awk '
-	/^(```|~~~)/ {
-		marker = substr($0, 1, 3)
-		if (in_fence) {
-			if (marker == fence_marker) { in_fence = 0 }
-		} else {
-			in_fence = 1
-			fence_marker = marker
+	# CommonMark はフェンス文字の行頭連続数(run 長)で開始・終了を判定する。
+	# 3 文字一致だけで見ると、4 バッククォート以上のフェンス内に ``` が
+	# 現れたときに誤って閉じてしまう(lint.sh と同じ判定仕様)。
+	function fence_run(s,    c, n) {
+		c = substr(s, 1, 1)
+		n = 0
+		while (substr(s, n + 1, 1) == c) n++
+		return n
+	}
+	{
+		c = substr($0, 1, 1)
+		if (c == "`" || c == "~") {
+			n = fence_run($0)
+			if (n >= 3) {
+				if (in_fence == 0) {
+					in_fence = 1
+					fence_char = c
+					fence_len = n
+					next
+				}
+				rest = substr($0, n + 1)
+				gsub(/[ \t]/, "", rest)
+				if (c == fence_char && n >= fence_len && rest == "") {
+					in_fence = 0
+					next
+				}
+			}
 		}
-		next
 	}
 	in_fence { next }
 	{

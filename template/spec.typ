@@ -282,6 +282,12 @@
     }
   }
 
+  // ---- 強調(斜体) ----
+  // 同梱フォントにイタリック体がないため斜体が直立体にフォールバックし、
+  // 見た目の変化なく静かに消えてしまう。和文の慣行に合わせ、emph は
+  // ゴシック体(直立)で表現する。
+  show emph: it => text(font: font-sans, style: "normal", it.body)
+
   // ---- 引用(blockquote) ----
   show quote.where(block: true): it => block(
     width: 100%,
