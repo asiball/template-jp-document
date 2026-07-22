@@ -12,26 +12,61 @@
 ARG PANDOC_IMAGE=pandoc/core:3.10
 FROM ${PANDOC_IMAGE}
 
-# 変更時は TYPST_SHA256 も差し替え、Makefile の DOCKER_TAG を上げる(BUILDING.md 参照)。
+# 変更時は TYPST_SHA256_X86_64 / TYPST_SHA256_AARCH64 も差し替える(BUILDING.md 参照)。
+# Dockerfile の内容が変わると Makefile 側の DOCKER_TAG(内容ハッシュ)も
+# 自動的に変わるため、手動でのバージョン管理は不要。
 ARG TYPST_VERSION=0.15.0
-# 別アーキテクチャ向けは `--build-arg TYPST_ARCH=aarch64-unknown-linux-musl`
-# 等を指定する(TYPST_SHA256 も対応する値に差し替える。BUILDING.md の Docker 節参照)。
-ARG TYPST_ARCH=x86_64-unknown-linux-musl
-# 既定の TYPST_VERSION / TYPST_ARCH 用の sha256(GitHub Releases のアセット
-# ダイジェスト)。不一致の場合ビルドはエラーで停止する。
-ARG TYPST_SHA256="59b207df01be2dab9f13e80f73d04d7ff8273ffd46b3dd1b9eef5c60f3eeabea"
-# TYPST_SHA256 を明示的に空にする場合は ALLOW_UNVERIFIED=1 の指定を必須とする
-# (検証なしの「暗黙のスキップ」を防ぐフェイルセーフ)。
+# 空の場合は RUN 内で `uname -m` から自動選択する(x86_64 / aarch64 のみ)。
+# それ以外のアーキテクチャ、または既定の自動選択を上書きしたい場合は
+# `--build-arg TYPST_ARCH=...` で明示指定する(BUILDING.md の Docker 節参照)。
+ARG TYPST_ARCH=""
+# 既定の TYPST_VERSION 用、x86_64 / aarch64 それぞれの sha256(GitHub
+# Releases のアセットダイジェスト)。TYPST_ARCH 自動選択時はここから対応する
+# 値を選ぶ。TYPST_ARCH を明示指定するアーキテクチャがこの 2 つ以外の場合は
+# 焼き込み値がないため、TYPST_SHA256 の明示指定が必要になる。
+ARG TYPST_SHA256_X86_64="59b207df01be2dab9f13e80f73d04d7ff8273ffd46b3dd1b9eef5c60f3eeabea"
+ARG TYPST_SHA256_AARCH64="cdf50ffc7b8ba759ed02200632eda3d78eb8b99aacb6611f4f75684990647620"
+# 明示指定時はこの値を検証に使う(焼き込み値より優先)。空の場合は
+# TYPST_SHA256_X86_64 / TYPST_SHA256_AARCH64 から選択された値を使う。
+ARG TYPST_SHA256=""
+# TYPST_SHA256 も焼き込み値もない場合(未知アーキテクチャで TYPST_SHA256 も
+# 未指定)は ALLOW_UNVERIFIED=1 の指定を必須とする(検証なしの「暗黙の
+# スキップ」を防ぐフェイルセーフ)。
 ARG ALLOW_UNVERIFIED=""
 
 USER root
 
 RUN set -eu; \
 	apk add --no-cache curl xz ca-certificates; \
+	if [ -z "$TYPST_ARCH" ]; then \
+		case "$(uname -m)" in \
+			x86_64) TYPST_ARCH="x86_64-unknown-linux-musl" ;; \
+			aarch64|arm64) TYPST_ARCH="aarch64-unknown-linux-musl" ;; \
+			*) \
+				echo "ERROR: 未知のアーキテクチャです($(uname -m))。TYPST_ARCH と TYPST_SHA256 を明示指定してください。" >&2; \
+				echo "  例: docker build --build-arg TYPST_ARCH=<対応するターゲット triple> --build-arg TYPST_SHA256=<対応するsha256> ." >&2; \
+				exit 1 ;; \
+		esac; \
+	fi; \
 	arch_url="https://github.com/typst/typst/releases/download/v${TYPST_VERSION}/typst-${TYPST_ARCH}.tar.xz"; \
 	curl -fsSL -o /tmp/typst.tar.xz "$arch_url"; \
+	# 検証 sha の優先順位: 明示指定 > ALLOW_UNVERIFIED によるスキップ >
+	# 焼き込み値。ALLOW_UNVERIFIED を焼き込み値より優先するのは、バージョンを
+	# 上げて焼き込み値が古くなった場合(必ず不一致で停止する)の脱出ハッチを
+	# 残すため。
 	if [ -n "$TYPST_SHA256" ]; then \
-		echo "${TYPST_SHA256}  /tmp/typst.tar.xz" | sha256sum -c -; \
+		sha="$TYPST_SHA256"; \
+	elif [ -n "$ALLOW_UNVERIFIED" ]; then \
+		sha=""; \
+	else \
+		case "$TYPST_ARCH" in \
+			x86_64-unknown-linux-musl) sha="$TYPST_SHA256_X86_64" ;; \
+			aarch64-unknown-linux-musl) sha="$TYPST_SHA256_AARCH64" ;; \
+			*) sha="" ;; \
+		esac; \
+	fi; \
+	if [ -n "$sha" ]; then \
+		echo "${sha}  /tmp/typst.tar.xz" | sha256sum -c -; \
 	elif [ -n "$ALLOW_UNVERIFIED" ]; then \
 		echo "WARNING: TYPST_SHA256 が未指定のため、チェックサム検証をスキップしました(ALLOW_UNVERIFIED が明示的に指定されているため続行します)。" >&2; \
 	else \
@@ -49,8 +84,7 @@ RUN set -eu; \
 
 # PlantUML(Markdown から参照する .puml の SVG 変換に使用。README の「図の
 # 挿入」節参照)。Maven Central の jar はアーキテクチャ非依存・イミュータブル
-# なので、バージョンと sha256 の固定だけで決定的に導入できる。変更時は
-# Makefile の DOCKER_TAG を上げること。
+# なので、バージョンと sha256 の固定だけで決定的に導入できる。
 ARG PLANTUML_VERSION=1.2026.6
 ARG PLANTUML_SHA256="e620ae095a2ba0134d3c33fd5ae34ff01e785f3df1796c0898802b8761a033a8"
 

@@ -63,9 +63,6 @@ DIAGRAM_SVGS    := $(sort $(shell sh scripts/list-diagram-refs.sh $(SRC_INPUTS) 
 DIAGRAM_PUMLS   := $(patsubst $(DIAGRAM_OUT)/%.svg,$(DIAGRAM_DIR)/%.puml,$(DIAGRAM_SVGS))
 
 DOCKER_IMAGE   := jp-spec-builder
-# ツールチェーン(pandoc / typst / plantuml / フォント)の固定バージョンを変更したら上げる。
-DOCKER_TAG     := 3.0
-DOCKER_FULLTAG := $(DOCKER_IMAGE):$(DOCKER_TAG)
 
 # Typst バイナリのチェックサム検証(既定値は Dockerfile に設定済みのため
 # 通常は指定不要。バージョン/アーキテクチャ変更時のみ上書きする。BUILDING.md 参照)。
@@ -73,6 +70,14 @@ DOCKER_FULLTAG := $(DOCKER_IMAGE):$(DOCKER_TAG)
 #   make pdf ALLOW_UNVERIFIED=1      検証をスキップする(非推奨)
 TYPST_SHA256     ?=
 ALLOW_UNVERIFIED ?=
+
+# Dockerfile の内容(+検証系オーバーライド)から導出する内容ハッシュ。
+# Dockerfile を変更すると自動的に別タグになり、次回ビルドで再構築が走る
+# (手動でのバージョンバンプは不要)。sha256sum は macOS に無いため POSIX の
+# cksum を使う。TYPST_SHA256 / ALLOW_UNVERIFIED はこの行より前で定義済み
+# であること(ハッシュに含めるため)。
+DOCKER_TAG     := $(shell { cat Dockerfile; printf '%s %s' "$(TYPST_SHA256)" "$(ALLOW_UNVERIFIED)"; } | cksum | cut -d' ' -f1)
+DOCKER_FULLTAG := $(DOCKER_IMAGE):$(DOCKER_TAG)
 
 # SRC / 改訂履歴ファイルの共通検証(validate ターゲットから展開する)。
 # スペースを含むパスは Make が単語分割してしまうため、対応せず明確なエラーで
@@ -146,12 +151,21 @@ pdf: validate docker-build
 	@mkdir -p "$(BUILD)"
 	$(DOCKER_RUN) $(CONTAINER_ENV) $(DOCKER_FULLTAG) sh scripts/container-build.sh
 
-# TYPST_SHA256 / ALLOW_UNVERIFIED は指定時のみ --build-arg で渡す(空文字を
-# 渡すと Dockerfile の既定 sha256 を潰すため)。ALLOW_UNVERIFIED=1 単独指定時
-# は sha を明示的に空で渡して検証をスキップさせる。
+# DOCKER_TAG はイメージ構築対象の内容ハッシュなので、そのタグのイメージが
+# 既に存在するなら同じ Dockerfile 内容で構築済みであり、再構築は不要。
+# デーモン未接続はここで検知する(docker build の生エラーは非技術者に分かり
+# にくいため)。
 docker-build:
+	@if ! docker info >/dev/null 2>&1; then \
+		echo "ERROR: Docker デーモンに接続できません。Docker Desktop(または docker サービス)が起動しているか確認してください。" >&2; \
+		exit 1; \
+	fi
+	@if docker image inspect $(DOCKER_FULLTAG) >/dev/null 2>&1; then \
+		exit 0; \
+	fi; \
 	docker build \
-		$(if $(TYPST_SHA256),--build-arg TYPST_SHA256=$(TYPST_SHA256),$(if $(ALLOW_UNVERIFIED),--build-arg TYPST_SHA256= --build-arg ALLOW_UNVERIFIED=$(ALLOW_UNVERIFIED))) \
+		$(if $(TYPST_SHA256),--build-arg TYPST_SHA256=$(TYPST_SHA256)) \
+		$(if $(ALLOW_UNVERIFIED),--build-arg ALLOW_UNVERIFIED=$(ALLOW_UNVERIFIED)) \
 		-t $(DOCKER_FULLTAG) -t $(DOCKER_IMAGE):latest .
 
 # 執筆中の自動リビルド。コンテナ内で container-build.sh が watch モードで
