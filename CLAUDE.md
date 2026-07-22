@@ -12,6 +12,7 @@ make pdf SRC=docs/foo.md      # 単一 Markdown ファイルをビルド
 make pdf SRC=docs/foo         # 章別ファイル分割ディレクトリをビルド(下記参照)
 make watch SRC=docs/foo.md    # 執筆中の自動リビルド(保存するたびに再ビルド。Ctrl-C で終了)
 make lint                     # docs/ と examples/ の Markdown(単一ファイル+章別ファイル分割)の簡易 lint のみを実行
+make test                     # scripts/lint.sh 自体の回帰テスト(scripts/test-lint.sh)を実行
 make clean                    # build/ を削除
 ```
 

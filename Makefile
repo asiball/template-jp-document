@@ -155,7 +155,7 @@ fi
 fi
 endef
 
-.PHONY: pdf pdf-docker docker-build watch clean lint lint-src check-versions diagrams
+.PHONY: pdf pdf-docker docker-build watch clean lint lint-src test check-versions diagrams
 
 pdf: check-versions $(BUILD)/$(NAME).pdf
 
@@ -198,6 +198,11 @@ lint:
 # 並行し、lint 失敗でも .typ が生成されてしまうため)。
 lint-src:
 	@sh scripts/lint.sh $(SRC_INPUTS)
+
+# scripts/lint.sh 自体の回帰テスト(検出すべき違反を検出し、正常な原稿を
+# 誤検知しないことをサンドボックス上のフィクスチャで検証する)。
+test:
+	@sh scripts/test-lint.sh
 
 # .revisions.md がある場合のみ定義される中間 YAML の生成ルール。
 # check-versions は order-only: `make -j` でも検証を変換より先に完了させる。
