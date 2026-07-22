@@ -77,18 +77,18 @@ REV_PREREQ     :=
 REV_CONVERT    := true
 endif
 
-# PlantUML 図の変換(README の「図の挿入」節参照)。SRC が画像参照している
-# /assets/diagrams/*.puml だけを SVG へ変換する(参照抽出はコードフェンスを
-# 除外するため scripts/list-diagram-refs.sh で行う)。図を使わない文書の
-# ビルドには plantuml を要求しない。Markdown 内の .puml 参照はビルド時に
-# scripts/diagram-filter.lua が変換済み SVG のパスへ書き換える。
+# PlantUML 図の変換(README の「図の挿入」節参照)。Markdown は変換後の
+# /build/diagrams/<name>.svg を画像参照し(ビルド後はエディタの Markdown
+# プレビューでもそのまま表示できる)、make が参照 SVG から名前の 1:1 対応で
+# assets/diagrams/<name>.puml を逆引きして変換する。参照抽出はコードフェンス
+# を除外するため scripts/list-diagram-refs.sh で行う。SRC が参照する図だけを
+# 変換し、図を使わない文書のビルドには plantuml を要求しない。
 DIAGRAM_DIR     := assets/diagrams
 DIAGRAM_OUT     := $(BUILD)/diagrams
 PLANTUML        ?= plantuml
 PLANTUML_CONFIG := template/plantuml.config
-DIAGRAM_FILTER  := scripts/diagram-filter.lua
-DIAGRAM_REFS    := $(sort $(shell sh scripts/list-diagram-refs.sh $(SRC_INPUTS) 2>/dev/null))
-DIAGRAM_SVGS    := $(patsubst $(DIAGRAM_DIR)/%.puml,$(DIAGRAM_OUT)/%.svg,$(DIAGRAM_REFS))
+DIAGRAM_SVGS    := $(sort $(shell sh scripts/list-diagram-refs.sh $(SRC_INPUTS) 2>/dev/null))
+DIAGRAM_PUMLS   := $(patsubst $(DIAGRAM_OUT)/%.svg,$(DIAGRAM_DIR)/%.puml,$(DIAGRAM_SVGS))
 
 # 期待バージョン(Dockerfile の固定値と揃える。BUILDING.md 参照)。
 EXPECTED_PANDOC := 3.10
@@ -145,10 +145,10 @@ fi
 	echo "ERROR: $(REV_MD) と $(REV_YAML) が両方存在します。改訂履歴ファイルはどちらか一方のみにしてください(推奨: $(if $(filter 1,$(SRC_IS_DIR)),revisions.md,.revisions.md))。" >&2; \
 	exit 1; \
 fi
-@if [ -n "$(strip $(DIAGRAM_REFS))" ]; then \
-	for p in $(DIAGRAM_REFS); do \
+@if [ -n "$(strip $(DIAGRAM_PUMLS))" ]; then \
+	for p in $(DIAGRAM_PUMLS); do \
 		if [ ! -f "$$p" ]; then \
-			echo "ERROR: Markdown から参照されている PlantUML ソースが見つかりません: /$$p($(DIAGRAM_DIR)/ に .puml を置き、/$(DIAGRAM_DIR)/<name>.puml で参照してください)。" >&2; \
+			echo "ERROR: Markdown から参照されている図に対応する PlantUML ソースが見つかりません: $$p(参照 /$(DIAGRAM_OUT)/<name>.svg に対し、ソースを $(DIAGRAM_DIR)/<name>.puml として置いてください)。" >&2; \
 			exit 1; \
 		fi; \
 	done; \
@@ -179,7 +179,7 @@ check-versions:
 			echo "WARNING: typst のバージョン($${typst_ver:-不明})が期待バージョン($(EXPECTED_TYPST))と異なります(make pdf-docker で固定環境を使えます)。"; \
 		fi; \
 	fi
-	@if [ -n "$(strip $(DIAGRAM_REFS))" ]; then \
+	@if [ -n "$(strip $(DIAGRAM_SVGS))" ]; then \
 		plantuml_line="$$($(PLANTUML) -version 2>/dev/null | head -n1 || true)"; \
 		echo "plantuml: $${plantuml_line:-(バージョン取得に失敗しました。未インストールの場合は変換時に案内を表示します)}"; \
 		plantuml_ver="$$(printf '%s' "$$plantuml_line" | awk '{print $$3}')"; \
@@ -222,7 +222,7 @@ diagrams: $(DIAGRAM_SVGS)
 # pandoc は複数の入力ファイル($(SRC_INPUTS))を連結して 1 文書として処理する。
 # check-versions は order-only: -j 時も検証を先に完了させつつ、phony 起因の
 # 再ビルドは起こさない。
-$(OBJ)/$(NAME).typ: $(SRC_INPUTS) $(TEMPLATE) template/spec.typ $(DIAGRAM_FILTER) $(REV_PREREQ) | check-versions
+$(OBJ)/$(NAME).typ: $(SRC_INPUTS) $(TEMPLATE) template/spec.typ $(REV_PREREQ) | check-versions
 	@mkdir -p "$(OBJ)"
 	sh scripts/lint.sh $(SRC_INPUTS) && \
 	pandoc \
@@ -230,7 +230,6 @@ $(OBJ)/$(NAME).typ: $(SRC_INPUTS) $(TEMPLATE) template/spec.typ $(DIAGRAM_FILTER
 		--to typst \
 		--standalone \
 		--template "$(TEMPLATE)" \
-		--lua-filter "$(DIAGRAM_FILTER)" \
 		$(METADATA_FLAG) \
 		-o "$@" \
 		$(SRC_INPUTS)
@@ -259,26 +258,26 @@ pdf-docker: docker-build
 			mkdir -p "$(OBJ)" && \
 			sh scripts/lint.sh $(SRC_INPUTS) && \
 			$(REV_CONVERT) && \
-			if [ -n "$(strip $(DIAGRAM_REFS))" ]; then \
-				for p in $(DIAGRAM_REFS); do \
+			if [ -n "$(strip $(DIAGRAM_PUMLS))" ]; then \
+				for p in $(DIAGRAM_PUMLS); do \
 					sh scripts/puml2svg.sh "$$p" "$(DIAGRAM_OUT)/$$(basename "$$p" .puml).svg" || exit 1; \
 				done; \
 			fi && \
-			pandoc --from markdown --to typst --standalone --template "$(TEMPLATE)" --lua-filter "$(DIAGRAM_FILTER)" $(METADATA_FLAG) -o "$(OBJ)/$(NAME).typ" $(SRC_INPUTS) && \
+			pandoc --from markdown --to typst --standalone --template "$(TEMPLATE)" $(METADATA_FLAG) -o "$(OBJ)/$(NAME).typ" $(SRC_INPUTS) && \
 			typst compile --root . --font-path "$(FONT_DIR)" --ignore-system-fonts "$(OBJ)/$(NAME).typ" "$(BUILD)/$(NAME).pdf" \
 		'
 
 # 執筆中の自動リビルド: 初回ビルド(pdf)→ typst watch をバックグラウンド起動
-# → $(SRC_INPUTS)(+改訂履歴ファイル+参照中の .puml と plantuml.config)を
-# 1 秒間隔でポーリングし、変更検知で lint → YAML 変換 → 図の再変換 → pandoc を
-# 再実行する(.typ の再生成は typst watch が拾って PDF に反映する)。図の
-# 再変換はサブ make(diagrams ターゲット)で行う: mtime 比較で変更分だけを
-# 変換でき、Markdown に新しく追加された .puml 参照も DIAGRAM_REFS の再評価で
-# 拾える(ただし新規参照の .puml 自体はポーリング対象に入らないため、その
-# 後の編集を検知するには watch の再起動が必要)。POSIX sh のみで実装(mtime
-# 比較は `find -newer` + スタンプファイル)。lint / 変換 / pandoc のエラーでは
-# 停止せず監視を継続する。Ctrl-C で typst watch ごと終了する。SRC の検証は
-# prerequisite の pdf 側で実施済み。
+# → $(SRC_INPUTS)(+改訂履歴ファイル+参照中の図の .puml と plantuml.config)
+# を 1 秒間隔でポーリングし、変更検知で lint → YAML 変換 → 図の再変換 →
+# pandoc を再実行する(.typ の再生成は typst watch が拾って PDF に反映する)。
+# 図の再変換はサブ make(diagrams ターゲット)で行う: mtime 比較で変更分だけ
+# を変換でき、Markdown に新しく追加された図の参照も DIAGRAM_SVGS の再評価で
+# 拾える(ただし新規参照に対応する .puml 自体はポーリング対象に入らないため、
+# その後の編集を検知するには watch の再起動が必要)。POSIX sh のみで実装
+# (mtime 比較は `find -newer` + スタンプファイル)。lint / 変換 / pandoc の
+# エラーでは停止せず監視を継続する。Ctrl-C で typst watch ごと終了する。
+# SRC の検証は prerequisite の pdf 側で実施済み。
 watch: pdf
 	@stamp="$(OBJ)/.watch-stamp-$(NAME)"; \
 	touch "$$stamp"; \
@@ -296,13 +295,13 @@ watch: pdf
 			echo "ERROR: typst watch が終了しました(ログを確認してください)" >&2; \
 			exit 1; \
 		fi; \
-		changed=$$(find $(SRC_INPUTS) $(REV_WATCH) $(DIAGRAM_REFS) $(PLANTUML_CONFIG) -newer "$$stamp" 2>/dev/null); \
+		changed=$$(find $(SRC_INPUTS) $(REV_WATCH) $(DIAGRAM_PUMLS) $(PLANTUML_CONFIG) -newer "$$stamp" 2>/dev/null); \
 		if [ -n "$$changed" ]; then \
 			touch "$$stamp"; \
 			if sh scripts/lint.sh $(SRC_INPUTS); then \
 				if $(REV_CONVERT); then \
 					if $(MAKE) --no-print-directory -s SRC="$(SRC)" PLANTUML="$(PLANTUML)" diagrams; then \
-						if pandoc --from markdown --to typst --standalone --template "$(TEMPLATE)" --lua-filter "$(DIAGRAM_FILTER)" $(METADATA_FLAG) -o "$(OBJ)/$(NAME).typ" $(SRC_INPUTS); then \
+						if pandoc --from markdown --to typst --standalone --template "$(TEMPLATE)" $(METADATA_FLAG) -o "$(OBJ)/$(NAME).typ" $(SRC_INPUTS); then \
 							echo "watch: 再生成しました($(OBJ)/$(NAME).typ) -- typst watch が自動で再コンパイルします"; \
 						else \
 							echo "WARNING: pandoc の変換に失敗しました(watch は継続します。修正して保存すると再試行します)" >&2; \

@@ -17,9 +17,10 @@
 #     前方を上書きし、00-meta.md の title 等が消えるため)
 #   - 見出しの手動採番: `# 1. foo` / `## 2) foo` / `# 第1章 foo` / `# 1章 foo`
 #     (Typst の自動採番と二重になるため。全ファイルが対象)
-#   - PlantUML 参照の不備: 画像参照する .puml が /assets/diagrams/<name>.puml
-#     形式(ルート絶対パス)でない、または参照先ファイルが存在しない
-#     (どちらもビルド後半で分かりにくいエラーになるため早期に止める)
+#   - PlantUML 参照の不備: .puml の直接画像参照(変換後の SVG を参照する
+#     規約)、/build/diagrams/<name>.svg 形式(ルート絶対パス)でない図の
+#     参照、参照 SVG に対応する assets/diagrams/<name>.puml の不存在
+#     (いずれもビルド後半で分かりにくいエラーになるため早期に止める)
 #
 # 警告(exit 0。ビルドは継続):
 #   - 見出しが数字で始まる(`## 2.5 系` 等。手動採番の疑いがあるだけの場合)
@@ -171,18 +172,23 @@ for f in "$@"; do
 
 		# --- PlantUML 参照のチェック ---
 		case "$line" in
-			*']('*'.puml'*)
-				target=$(printf '%s' "$line" | sed -n -E 's/.*\]\(([^) ]*\.puml)[^)]*\).*/\1/p')
+			*']('*'.puml'*|*']('*'build/diagrams/'*)
+				target=$(printf '%s' "$line" | sed -n -E 's/.*\]\(([^) ]+)[^)]*\).*/\1/p')
 				if [ -n "$target" ]; then
 					case "$target" in
-						/assets/diagrams/*.puml)
-							if [ ! -f "${target#/}" ]; then
-								echo "ERROR: $f:$lineno: 参照先の PlantUML ソースが存在しません: $target(assets/diagrams/ に .puml を置いてください)。" >&2
+						*.puml)
+							echo "ERROR: $f:$lineno: .puml を直接画像参照することはできません: $target(変換後の /build/diagrams/<name>.svg を参照し、ソースを assets/diagrams/<name>.puml に置いてください。README の「図の挿入」参照)。" >&2
+							found_error=1
+							;;
+						/build/diagrams/*.svg)
+							puml="assets/diagrams/$(basename "$target" .svg).puml"
+							if [ ! -f "$puml" ]; then
+								echo "ERROR: $f:$lineno: 参照 $target に対応する PlantUML ソースが存在しません: $puml を置いてください。" >&2
 								found_error=1
 							fi
 							;;
-						*)
-							echo "ERROR: $f:$lineno: PlantUML ソースの参照は /assets/diagrams/<name>.puml 形式(リポジトリルートからの絶対パス)で書いてください: $target(この形式以外はビルド時に SVG へ差し替えられません)。" >&2
+						*build/diagrams/*)
+							echo "ERROR: $f:$lineno: PlantUML 変換図の参照は /build/diagrams/<name>.svg 形式(リポジトリルートからの絶対パス)で書いてください: $target" >&2
 							found_error=1
 							;;
 					esac

@@ -109,10 +109,10 @@ docs/my-spec/
 ![構成図の説明文](/assets/images/example.png)
 ```
 
-シーケンス図や状態遷移図などは、PlantUML というテキスト記法のソースファイル（`.puml`）を `/assets/diagrams/` に置いて同じように参照すると、ビルド時に自動で図に変換されます（画像ファイルを自分で作る必要はありません。詳細は [README](README.md) の「図の挿入」節を参照）。
+シーケンス図や状態遷移図などは、PlantUML というテキスト記法のソースファイル（`.puml`）を `/assets/diagrams/` に置き、本文からは変換後の画像パス（`/build/diagrams/<同じ名前>.svg`）を参照します。ビルド時に自動で図に変換されるので、画像ファイルを自分で作る必要はありません（詳細は [README](README.md) の「図の挿入」節を参照）。
 
 ```markdown
-![在庫引当作成の処理シーケンス](/assets/diagrams/reservation-sequence.puml)
+![在庫引当作成の処理シーケンス](/build/diagrams/reservation-sequence.svg)
 ```
 
 脚注は本文中に番号を置き、同じ番号の内容を文末にまとめて書きます。

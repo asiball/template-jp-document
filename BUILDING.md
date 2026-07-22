@@ -35,7 +35,7 @@ brew install plantuml graphviz    # PlantUML 図を使う場合のみ(README の
 #   使い方: make pdf PLANTUML='java -jar /path/to/plantuml-1.2026.6.jar'
 ```
 
-plantuml が必要になるのは、ビルド対象の文書が `/assets/diagrams/*.puml` を参照している場合だけです。図を使わない文書のビルドには不要です(`Makefile` が参照の有無を判定します)。シーケンス図以外(クラス図・状態遷移図など)のレイアウトには Graphviz も必要です。
+plantuml が必要になるのは、ビルド対象の文書が PlantUML 変換図(`/build/diagrams/*.svg`)を参照している場合だけです。図を使わない文書のビルドには不要です(`Makefile` が参照の有無を判定します)。シーケンス図以外(クラス図・状態遷移図など)のレイアウトには Graphviz も必要です。
 
 ## Docker(推奨・「正」のビルド方法)
 
