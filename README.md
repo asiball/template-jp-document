@@ -70,7 +70,7 @@ make pdf SRC=docs/my-spec.md
 │   ├── revisions-md2yaml.sh          改訂履歴の Markdown パイプ表 → YAML 変換(`make pdf` がビルド時に自動実行)
 │   ├── puml2svg.sh                   PlantUML → SVG 変換(`make pdf` がビルド時に自動実行)
 │   └── list-diagram-refs.sh          Markdown が参照する図の列挙(Makefile が変換対象の決定に使用)
-├── .github/workflows/build.yml       CI(PR ごとに make pdf-docker でサンプルをビルド検証)
+├── .github/workflows/build.yml       CI(PR ごとに lint・lint.sh の回帰テスト・make pdf-docker でのサンプルビルドを検証)
 ├── Dockerfile                        決定的なビルド環境(BUILDING.md 参照)
 ├── Makefile                          ビルドコマンド一式
 ├── README.md                         このファイル
