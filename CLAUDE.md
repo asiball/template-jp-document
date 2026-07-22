@@ -16,7 +16,7 @@ make test                     # scripts/lint.sh 自体の回帰テスト(scripts
 make clean                    # build/ を削除
 ```
 
-ビルドはすべて Docker コンテナ内で実行される(pandoc / typst / plantuml とフォントはイメージ内に固定バージョン+チェックサム検証で導入。ローカルへのインストールは不要で、Docker と make だけが必要)。`make pdf` は次の順で実行されます(検証は `Makefile`、ビルド本体はコンテナ内の `scripts/container-build.sh`)。
+ビルドはすべて Docker コンテナ内で実行される(pandoc / typst / plantuml とフォントはイメージ内に固定バージョン+チェックサム検証で導入。ローカルへのインストールは不要で、Docker と make だけが必要)。ツールチェーンやフォントの固定バージョンを変更したときは、`Makefile` の `DOCKER_TAG` を上げること(利用者側の次回ビルドでイメージ再構築が自動で走るようにするため)。`make pdf` は次の順で実行されます(検証は `Makefile`、ビルド本体はコンテナ内の `scripts/container-build.sh`)。
 
 1. `SRC` の存在確認(章別ファイル分割の場合は `00-meta.md` と章ファイルの有無、参照図に対応する `.puml` の有無)と改訂履歴ファイルの併存チェックを行い、続けて Docker イメージを用意する(未構築・ツールチェーン変更時のみ実体の構築が走る)。
 2. `scripts/lint.sh` でビルド対象の Markdown を簡易チェックする(`make lint` は docs/ と examples/ の `*.md` 全件 + 章別ファイル分割ディレクトリすべてが対象。ただし改訂履歴ファイル `*.revisions.md` / `<name>/revisions.md` は仕様書本文ではないため lint.sh 側で除外される。`.revisions.yaml` / `revisions.yaml` も対象外)。
@@ -100,3 +100,5 @@ CI(`.github/workflows/build.yml`)も PR ごとに同じ `make pdf` で examples 
 `template/template.typ` は Pandoc のメタデータを `spec-doc(...)` の引数へ橋渡しするだけで、見た目に関する記述を追加してはいけない。
 
 PlantUML 図の見た目(図中フォントなど全図共通の設定)だけは `template/plantuml.config` が担う(`spec.typ` は SVG の中身に関与できないため)。個々の図固有の `skinparam` は各 `.puml` に書いてよい。
+
+フォント自体を差し替える場合は、`template/spec.typ` のフォント定数だけでなく `Dockerfile` のフォント導入レイヤー(取得 URL と sha256)と `template/plantuml.config` の `defaultFontName` もあわせて変更する(手順は BUILDING.md の「フォント」節参照)。
