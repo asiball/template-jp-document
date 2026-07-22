@@ -1,9 +1,11 @@
 # =============================================================================
-# build.yml — PR で「正」のビルド(make pdf-docker)を検証する
+# build.yml — PR ごとにビルド(make pdf)を検証する
 #
-# ローカル環境に依存しない Docker ビルドを CI で毎回通すことで、次を保証する。
+# ビルドはローカルでも CI でも同じ Docker イメージ内で実行される。CI で毎回
+# 通すことで、次を保証する。
 #   - Dockerfile の固定ツールチェーン(pandoc/core:3.10 ベースイメージ、
-#     Typst 固定バージョン + sha256 検証)が実際に取得・構築できること
+#     Typst / PlantUML / フォントの sha256 検証付き取得)が実際に取得・
+#     構築できること
 #   - 同梱サンプル(章別ファイル分割・単一ファイルの両方式)が lint を通過し
 #     PDF まで到達すること(バージョンを上げる PR ではここが回帰検知になる)
 #   - scripts/lint.sh の回帰テスト(make test)が通ること(lint のルール変更
@@ -40,13 +42,13 @@ jobs:
       - name: Lint(docs / examples 全件)
         run: make lint
 
-      # 1 回目の pdf-docker が docker-build(イメージ構築)を含む。
+      # 1 回目の make pdf が docker-build(イメージ構築)を含む。
       # 2 回目以降はレイヤーキャッシュが効くためイメージ構築は一瞬で済む。
       - name: Build sample-spec(章別ファイル分割)
-        run: make pdf-docker
+        run: make pdf
 
       - name: Build wareki-api-spec(単一ファイル + 改訂履歴別ファイル)
-        run: make pdf-docker SRC=examples/wareki-api-spec.md
+        run: make pdf SRC=examples/wareki-api-spec.md
 
       - name: Upload PDFs
         uses: actions/upload-artifact@v4

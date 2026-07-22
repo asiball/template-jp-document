@@ -128,14 +128,14 @@ docs/my-spec/
 
 ## ビルドして PDF を確認する
 
-自分のパソコンに pandoc / typst が入っていれば、次のコマンドで PDF を作れます。
+自分のパソコンで Docker が使えれば、次のコマンドで PDF を作れます（初回はビルド環境の準備で数分かかります。2 回目以降はすぐに終わります）。
 
 ```sh
 make pdf SRC=docs/my-spec.md    # 1 ファイル方式の場合
 make pdf SRC=docs/my-spec       # 章分割方式の場合(.md を付けない)
 ```
 
-環境構築が難しい場合は、開発メンバーやビルド担当者に「`docs/my-spec.md`（または `docs/my-spec/`）をビルドしてほしい」と依頼してください。
+Docker が使えない場合は、開発メンバーやビルド担当者に「`docs/my-spec.md`（または `docs/my-spec/`）をビルドしてほしい」と依頼してください。
 
 ## やってはいけないこと
 
