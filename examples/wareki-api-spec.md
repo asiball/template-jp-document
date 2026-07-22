@@ -324,7 +324,7 @@ def eras(*, since: datetime.date | str | None = None) -> list[Era]: ...
 >>> [e.name for e in eras()]
 ['明治', '大正', '昭和', '平成', '令和']
 >>> import datetime
->>> [e.name for e in eras(since=datetime.date(1990, 1, 1))]
+>>> [e.name for e in eras(since=datetime.date(1989, 1, 1))]
 ['平成', '令和']
 ```
 

@@ -100,8 +100,8 @@ make clean                      # build/ を削除
 `make pdf` は次の段階を実行します(`Makefile` の実行順)。
 
 1. 実際の pandoc / typst(と、ビルド対象が PlantUML 図を参照している場合は plantuml)のバージョンを表示し、期待バージョン([BUILDING.md](BUILDING.md) の表)と異なる場合は警告を表示する(ビルドは継続する)。あわせて `SRC` の存在確認(章別ファイル分割の場合は `00-meta.md` と章ファイルの有無、参照されている `.puml` の有無)も行う。
-2. `scripts/lint.sh` でビルド対象の Markdown を簡易チェック(`make lint` 単体は docs/ と examples/ の `*.md` 全件 + 章別ファイル分割ディレクトリすべてが対象)。
-   - **エラー(ビルド停止)**: 見出しの手動採番(`# 1. foo` / `## 2) foo` のような「番号+ドット/括弧+空白」形式、`# 第1章 foo` / `# 1章 foo` のような「(第)N章/節/項」形式)、YAML フロントマターの `title:` 欠落・空、章別ファイル分割時に 00-meta.md 以外の章ファイルへ YAML フロントマターが混入していること、PlantUML 参照の不備(`/assets/diagrams/<name>.puml` 形式以外の参照、参照先ファイルの不存在)。
+2. `scripts/lint.sh` でビルド対象の Markdown を簡易チェック(`make lint` 単体は docs/ と examples/ の `*.md` 全件 + 章別ファイル分割ディレクトリすべてが対象。改訂履歴ファイル `*.revisions.md` / `revisions.md` / `revisions.yaml` は仕様書本文ではないため対象外)。
+   - **エラー(ビルド停止)**: 見出しの手動採番(`# 1. foo` / `## 2) foo` のような「番号+ドット/括弧+空白」形式、`# 第1章 foo` / `# 1章 foo` のような「(第)N章/節/項」形式)、YAML フロントマターの `title:` 欠落・空、章別ファイル分割時に 00-meta.md 以外の章ファイルへ YAML フロントマターが混入していること、PlantUML 参照の不備(`.puml` の直接画像参照、`/build/diagrams/<name>.svg` 形式(ルート絶対パス)以外の図の参照、参照に対応する `assets/diagrams/<name>.puml` の不存在)。
    - **警告(ビルド継続)**: 見出しが数字で始まる(`## 2.5 系` のようなバージョン表記など、上記エラーパターンには一致しないが手動採番の疑いがあるケース)、生 Typst(` ```{=typst} `)ブロック内の装飾コード検出、章別ファイル分割時に同一ディレクトリ内の複数章ファイルで脚注定義 ID(`[^id]:`)が重複していること。
 3. ビルド対象の Markdown が参照している PlantUML 変換図(`/build/diagrams/*.svg`)に対応するソース(`assets/diagrams/<name>.puml`)を `scripts/puml2svg.sh` で変換する(変更されたものだけを再変換。図を参照していない文書では何もしないため、plantuml のインストールも不要)。
 4. `pandoc --from markdown --to typst --standalone --template template/template.typ` で Markdown を Typst ソースに変換(`build/obj/<name>.typ` に出力)。章別ファイル分割の場合は 00-meta.md を含む章ファイル一覧(ファイル名の辞書順)を複数の入力として pandoc に渡す(pandoc は複数入力ファイルを連結して 1 文書として処理する)。改訂履歴を別ファイル化している場合は、`revisions.md`(または `<name>.revisions.md`)を YAML に変換したうえで(YAML 方式ならそのまま)`--metadata-file` も付与される(下記「改訂履歴の別ファイル化」参照)
@@ -272,7 +272,7 @@ revisions:
 | 1.1 | 2026-06-10 | 鈴木花子 | API仕様の章を追加 |
 ```
 
-ファイルを置くだけでよく、`Makefile` 側の設定変更は不要です。ビルド時に `scripts/revisions-md2yaml.sh` がこの表を `build/<name>.revisions.yaml`(中間ファイル)へ変換し、pandoc に `--metadata-file` として渡します(`make pdf` / `make pdf-docker` / `make watch` のすべてが対応)。
+ファイルを置くだけでよく、`Makefile` 側の設定変更は不要です。ビルド時に `scripts/revisions-md2yaml.sh` がこの表を `build/obj/<name>.revisions.yaml`(中間ファイル)へ変換し、pandoc に `--metadata-file` として渡します(`make pdf` / `make pdf-docker` / `make watch` のすべてが対応)。
 
 書式のルール:
 
