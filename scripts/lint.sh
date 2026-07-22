@@ -17,6 +17,9 @@
 #     前方を上書きし、00-meta.md の title 等が消えるため)
 #   - 見出しの手動採番: `# 1. foo` / `## 2) foo` / `# 第1章 foo` / `# 1章 foo`
 #     (Typst の自動採番と二重になるため。全ファイルが対象)
+#   - PlantUML 参照の不備: 画像参照する .puml が /assets/diagrams/<name>.puml
+#     形式(ルート絶対パス)でない、または参照先ファイルが存在しない
+#     (どちらもビルド後半で分かりにくいエラーになるため早期に止める)
 #
 # 警告(exit 0。ビルドは継続):
 #   - 見出しが数字で始まる(`## 2.5 系` 等。手動採番の疑いがあるだけの場合)
@@ -166,6 +169,27 @@ for f in "$@"; do
 				;;
 		esac
 
+		# --- PlantUML 参照のチェック ---
+		case "$line" in
+			*']('*'.puml'*)
+				target=$(printf '%s' "$line" | sed -n -E 's/.*\]\(([^) ]*\.puml)[^)]*\).*/\1/p')
+				if [ -n "$target" ]; then
+					case "$target" in
+						/assets/diagrams/*.puml)
+							if [ ! -f "${target#/}" ]; then
+								echo "ERROR: $f:$lineno: 参照先の PlantUML ソースが存在しません: $target(assets/diagrams/ に .puml を置いてください)。" >&2
+								found_error=1
+							fi
+							;;
+						*)
+							echo "ERROR: $f:$lineno: PlantUML ソースの参照は /assets/diagrams/<name>.puml 形式(リポジトリルートからの絶対パス)で書いてください: $target(この形式以外はビルド時に SVG へ差し替えられません)。" >&2
+							found_error=1
+							;;
+					esac
+				fi
+				;;
+		esac
+
 		# --- 脚注定義 ID の収集(章別ファイル分割時の重複検出用) ---
 		if [ "$is_chapter_mode" -eq 1 ]; then
 			case "$line" in
@@ -204,7 +228,7 @@ for accum in "$tmp"/footnotes-*.txt; do
 done
 
 if [ "$found_error" -eq 1 ]; then
-	echo "lint: 見出しの手動採番エラー・フロントマターの不備・章ファイルへのフロントマター混入のいずれかが見つかりました。上記の該当行を修正してください。" >&2
+	echo "lint: 見出しの手動採番エラー・フロントマターの不備・章ファイルへのフロントマター混入・PlantUML 参照の不備のいずれかが見つかりました。上記の該当行を修正してください。" >&2
 	exit 1
 fi
 

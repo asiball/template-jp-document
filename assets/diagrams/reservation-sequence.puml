@@ -1,0 +1,17 @@
+@startuml
+participant "クライアント" as client
+participant "在庫サービス" as service
+database "在庫DB" as db
+
+client -> service : POST /items/{sku}/reservations
+service -> db : 引当可能数量を照会
+db --> service : 引当可能数量
+
+alt 引当可能数量 >= 要求数量
+    service -> db : 引当を記録
+    db --> service : 記録完了
+    service --> client : 201 Created（引当IDを返却）
+else 引当可能数量 < 要求数量
+    service --> client : 409 Conflict（INSUFFICIENT_STOCK）
+end
+@enduml
