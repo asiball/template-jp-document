@@ -10,6 +10,9 @@
 #     PDF まで到達すること(バージョンを上げる PR ではここが回帰検知になる)
 #   - scripts/lint.sh の回帰テスト(make test)が通ること(lint のルール変更
 #     による検出漏れ・誤検知をビルド前に検知する)
+#   - docs/ 配下の利用者の文書(make pdf-all)。テンプレート時点では対象なし
+#     だが、これを元にした下流リポジトリでは docs/ に置いた文書が設定変更
+#     なしで自動的にビルド検証される
 # 生成した PDF はアーティファクトとして保存し、PR 上で見た目を確認できる。
 #
 # Docker イメージは actions/cache でキャッシュする(キー = Dockerfile の
@@ -65,10 +68,16 @@ jobs:
       # ミス時は 1 回目の make pdf でイメージを構築し、2 回目以降は
       # 同じイメージを使い回す。
       - name: Build sample-spec(章別ファイル分割)
-        run: make pdf
+        run: make pdf SRC=examples/sample-spec
 
       - name: Build wareki-api-spec(単一ファイル + 改訂履歴別ファイル)
         run: make pdf SRC=examples/wareki-api-spec.md
+
+      # 利用者の文書(テンプレート時点では対象なし)。下流リポジトリでは
+      # docs/ に置いた文書が設定変更なしで自動的にビルド検証される
+      # (docs/ が空なら pdf-all は何もせず終了する)。
+      - name: Build docs(利用者の文書。テンプレート時点では対象なし)
+        run: make pdf-all
 
       - name: Save image for cache
         if: steps.image-cache.outputs.cache-hit != 'true'

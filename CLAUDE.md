@@ -7,10 +7,11 @@
 ## ビルドコマンド
 
 ```sh
-make pdf                      # examples/sample-spec(章別ファイル分割)を build/sample-spec.pdf にビルド
-make pdf SRC=docs/foo.md      # 単一 Markdown ファイルをビルド
-make pdf SRC=docs/foo         # 章別ファイル分割ディレクトリをビルド(下記参照)
-make watch SRC=docs/foo.md    # 執筆中の自動リビルド(保存するたびに再ビルド。Ctrl-C で終了)
+make pdf SRC=docs/foo.md      # 単一 Markdown ファイルをビルド(SRC 必須)
+make pdf SRC=docs/foo         # 章別ファイル分割ディレクトリをビルド(下記参照。SRC 必須)
+make example                  # 同梱サンプル 2 種(章別ファイル分割・単一ファイル)をビルド
+make pdf-all                  # docs/ 配下のビルド対象を自動発見して全件ビルド
+make watch SRC=docs/foo.md    # 執筆中の自動リビルド(保存するたびに再ビルド。Ctrl-C で終了。SRC 必須)
 make lint                     # docs/ と examples/ の Markdown(単一ファイル+章別ファイル分割)の簡易 lint のみを実行
 make test                     # scripts/lint.sh 自体の回帰テスト(scripts/test-lint.sh)を実行
 make clean                    # build/ を削除
@@ -28,11 +29,11 @@ make clean                    # build/ を削除
 
 `build/` 配下のレイアウト: 最終成果物の PDF は `build/` 直下、中間生成物(`.typ` / 改訂履歴の変換 YAML)は `build/obj/`、PlantUML から変換した SVG は `build/diagrams/` に置かれる。
 
-CI(`.github/workflows/build.yml`)も PR ごとに同じ `make pdf` で examples のサンプル 2 種(章別ファイル分割・単一ファイル)をビルド検証する。
+CI(`.github/workflows/build.yml`)も PR ごとに同じ `make pdf` で examples のサンプル 2 種(章別ファイル分割・単一ファイル)をビルド検証し、続けて `make pdf-all` で docs/ 配下の利用者の文書をビルド検証する(テンプレート時点では docs/ が空のため no-op)。
 
 `SRC` のパスにスペースは使えない(Make の引数分割の制約のため)。スペースを含むパスを指定すると `make pdf` / `make watch` は明確なエラーメッセージで停止する(章別ファイル分割のディレクトリパスも対象)。単一ファイルの `SRC` は `.md` 拡張子が必須(改訂履歴の自動検出が `<name>.md` → `<name>.revisions.md` という命名規約に依存するため。`.md` 以外はエラーで停止する)。
 
-`make watch` は Docker コンテナ内で `scripts/container-build.sh` が watch モードで動き続ける(リポジトリはマウント共有のため、ホスト側エディタの編集がそのまま検知される)。構成は (a) 初回 `make pdf` 相当を実行 → (b) `typst watch` をバックグラウンド起動(`.typ` / `template/*.typ` の変更を自動検知)→ (c) `<SRC_INPUTS>`(と改訂履歴の別ファイル・参照図に対応する `.puml`・`template/plantuml.config`)を 1 秒間隔でポーリングし、変更を検知したら lint →(`.revisions.md` / `revisions.md` があれば YAML 変換)→ PlantUML 図の再変換(変更分のみ)→ pandoc を再実行して `.typ` を再生成する、という三段構成。章別ファイル分割の場合、章ファイルを 1 つ編集して保存するだけで `<SRC_INPUTS>` 全体が pandoc に再度渡され `.typ` 全体が再生成される(章ファイルを新規追加した場合はポーリング対象に含まれないため `make watch` の再起動が必要)。lint / 変換 / pandoc がエラーになっても watch 自体は停止せず継続する(修正して保存すれば次のポーリングで再試行される)。Ctrl-C で `typst watch` の子プロセスごと終了する。詳細は README の「執筆中の自動更新」節を参照。
+`make watch` は Docker コンテナ内で `scripts/container-build.sh` が watch モードで動き続ける(リポジトリはマウント共有のため、ホスト側エディタの編集がそのまま検知される)。構成は (a) 初回 `make pdf` 相当を実行 → (b) `typst watch` をバックグラウンド起動(`.typ` / `template/*.typ` の変更を自動検知)→ (c) `<SRC_INPUTS>`(と改訂履歴の別ファイル・参照図に対応する `.puml`・`template/plantuml.config`)を 1 秒間隔でポーリングし、変更を検知したら lint →(`.revisions.md` / `revisions.md` があれば YAML 変換)→ PlantUML 図の再変換(変更分のみ)→ pandoc を再実行して `.typ` を再生成する、という三段構成。章別ファイル分割の場合、章ファイルを 1 つ編集して保存するだけで `<SRC_INPUTS>` 全体が pandoc に再度渡され `.typ` 全体が再生成される(監視対象の章ファイル一覧・参照図の `.puml` 一覧はポーリングのたびに動的に再導出されるため、章ファイルの新規追加・削除や図参照の増減があっても `make watch` の再起動は不要)。lint / 変換 / pandoc がエラーになっても watch 自体は停止せず継続する(修正して保存すれば次のポーリングで再試行される)。Ctrl-C で `typst watch` の子プロセスごと終了する。詳細は README の「執筆中の自動更新」節を参照。
 
 ## 章別ファイル分割
 

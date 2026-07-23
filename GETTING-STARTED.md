@@ -21,6 +21,12 @@
 cp examples/wareki-api-spec.md docs/my-spec.md
 ```
 
+見本の改訂履歴も使いたい場合は、改訂履歴だけの別ファイルも併せてコピーしてください（本体だけコピーすると改訂履歴のページが出ません）。
+
+```sh
+cp examples/wareki-api-spec.revisions.md docs/my-spec.revisions.md
+```
+
 ファイル名（`my-spec` の部分）は半角の英数字とハイフンで自由に付けられます（日本語ファイル名は環境によって文字化けやビルドの不具合の原因になりうるため避けてください）。見出し・表・コードブロックといった「型」はすでに見本の中にあるので、内容だけを書き換えれば体裁は自動的に整います。
 
 ### 大きな文書は章分割（`sample-spec` 参考）
@@ -135,7 +141,7 @@ make pdf SRC=docs/my-spec.md    # 1 ファイル方式の場合
 make pdf SRC=docs/my-spec       # 章分割方式の場合(.md を付けない)
 ```
 
-Docker が使えない場合は、開発メンバーやビルド担当者に「`docs/my-spec.md`（または `docs/my-spec/`）をビルドしてほしい」と依頼してください。
+Docker が使えない場合は、開発メンバーやビルド担当者に「`docs/my-spec.md`（または `docs/my-spec/`）をビルドしてほしい」と依頼してください。GitHub に push して PR を出せば、CI が `docs/` 配下の文書を自動でビルドして PDF を生成します。手元に Docker がなくても、PR のワークフロー実行結果のアーティファクトから PDF をダウンロードして確認できます。
 
 ## やってはいけないこと
 

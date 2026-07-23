@@ -3,10 +3,11 @@
 # =============================================================================
 #
 # 使い方:
-#   make pdf                     examples/sample-spec(章別ファイル分割)をビルド
-#   make pdf SRC=docs/foo.md     単一 Markdown ファイルをビルド
-#   make pdf SRC=docs/foo        章別ファイル分割ディレクトリをビルド
-#   make watch                   執筆中の自動リビルド(README の「執筆中の自動更新」参照)
+#   make pdf SRC=docs/foo.md     単一 Markdown ファイルをビルド(SRC 必須)
+#   make pdf SRC=docs/foo        章別ファイル分割ディレクトリをビルド(SRC 必須)
+#   make example                 同梱サンプル 2 種(章別ファイル分割・単一ファイル)をビルド
+#   make pdf-all                 docs/ 配下のビルド対象を自動発見して全件ビルド
+#   make watch SRC=docs/foo.md   執筆中の自動リビルド(README の「執筆中の自動更新」参照。SRC 必須)
 #   make lint                    docs/ と examples/ の Markdown の簡易 lint のみを実行
 #   make test                    scripts/lint.sh 自体の回帰テストを実行
 #   make clean                   build/ を削除
@@ -17,7 +18,8 @@
 # scripts/container-build.sh が担う。lint(scripts/lint.sh)のみ POSIX sh
 # だけで動くためローカルで直接実行する。
 
-SRC        ?= examples/sample-spec
+# SRC は既定で空(同梱サンプルのビルドは make example に分離、validate-src が
+# 空チェックで案内エラーを出す)。
 # 末尾スラッシュを正規化する(コマンドライン指定値の上書きには override が必要)。
 override SRC := $(patsubst %/,%,$(SRC))
 NAME       := $(basename $(notdir $(SRC)))
@@ -59,7 +61,9 @@ REV_YAML_EXISTS  := $(wildcard $(REV_YAML))
 # 変換する。
 DIAGRAM_DIR     := assets/diagrams
 DIAGRAM_OUT     := $(BUILD)/diagrams
-DIAGRAM_SVGS    := $(sort $(shell sh scripts/list-diagram-refs.sh $(SRC_INPUTS) 2>/dev/null))
+# SRC_INPUTS が空(SRC 未指定)のときは list-diagram-refs.sh を引数なしで
+# 起動しない(引数なしだと awk が標準入力の到着を待ち続けて固まるため)。
+DIAGRAM_SVGS    := $(sort $(if $(SRC_INPUTS),$(shell sh scripts/list-diagram-refs.sh $(SRC_INPUTS) 2>/dev/null)))
 DIAGRAM_PUMLS   := $(patsubst $(DIAGRAM_OUT)/%.svg,$(DIAGRAM_DIR)/%.puml,$(DIAGRAM_SVGS))
 
 DOCKER_IMAGE   := jp-spec-builder
@@ -83,6 +87,10 @@ DOCKER_FULLTAG := $(DOCKER_IMAGE):$(DOCKER_TAG)
 # スペースを含むパスは Make が単語分割してしまうため、対応せず明確なエラーで
 # 停止する。
 define validate-src
+@if [ -z "$(SRC)" ]; then \
+	echo "ERROR: SRC を指定してください(例: make pdf SRC=docs/my-spec.md、章別ファイル分割は make pdf SRC=docs/my-spec)。同梱サンプルのビルドは make example を使ってください。" >&2; \
+	exit 1; \
+fi
 @case "$(SRC)" in \
 	*" "*) \
 		echo "ERROR: SRC のパスにスペースは使えません: $(SRC)" >&2; \
@@ -128,19 +136,20 @@ fi
 endef
 
 # ビルド対象の導出結果を container-build.sh へ渡す環境変数(スクリプト冒頭の
-# 環境変数一覧と揃える)。
+# 環境変数一覧と揃える)。SRC_DIR は章別ファイル分割のときのみ SRC を渡し、
+# watch モードが章ファイルの増減を毎回そこから動的に再導出できるようにする。
 CONTAINER_ENV := \
 	-e NAME="$(NAME)" \
 	-e SRC_INPUTS="$(SRC_INPUTS)" \
+	-e SRC_DIR="$(if $(filter 1,$(SRC_IS_DIR)),$(SRC))" \
 	-e REV_MD="$(REV_MD_EXISTS)" \
-	-e REV_YAML="$(REV_YAML_EXISTS)" \
-	-e DIAGRAM_PUMLS="$(DIAGRAM_PUMLS)"
+	-e REV_YAML="$(REV_YAML_EXISTS)"
 
 # --user: build/ 配下の生成物をホスト側の実行ユーザー所有にする(コンテナ内
 # root 所有で残ると消せなくなるため)。
 DOCKER_RUN := docker run --rm --user $$(id -u):$$(id -g) -v "$(CURDIR)":/work -w /work
 
-.PHONY: pdf docker-build validate watch clean lint lint-src test
+.PHONY: pdf example pdf-all docker-build validate watch clean lint lint-src test
 
 # SRC の検証を独立ターゲットにして、イメージ構築(docker-build)より先に
 # 安価な検証で失敗できるようにする(prerequisite の並び順で先行させる)。
@@ -150,6 +159,37 @@ validate:
 pdf: validate docker-build
 	@mkdir -p "$(BUILD)"
 	$(DOCKER_RUN) $(CONTAINER_ENV) $(DOCKER_FULLTAG) sh scripts/container-build.sh
+
+# 同梱サンプル 2 種(章別ファイル分割・単一ファイル)のビルド。SRC の既定値
+# 廃止に伴い、動作確認用のビルドはここに切り出す。
+example:
+	$(MAKE) pdf SRC=examples/sample-spec
+	$(MAKE) pdf SRC=examples/wareki-api-spec.md
+
+# docs/ 配下のビルド対象(単一ファイル + 章別ファイル分割)を自動発見して
+# 全件ビルドする。テンプレートを元にした下流リポジトリでは docs/ に文書を
+# 置くだけで CI 検証の対象になる(テンプレート時点では対象なしのため no-op)。
+pdf-all:
+	@found=0; \
+	for f in docs/*.md; do \
+		[ -f "$$f" ] || continue; \
+		case "$$f" in \
+			*.revisions.md) continue ;; \
+		esac; \
+		found=1; \
+		$(MAKE) pdf SRC="$$f" || exit 1; \
+	done; \
+	for d in docs/*/; do \
+		[ -d "$$d" ] || continue; \
+		d=$${d%/}; \
+		[ -f "$$d/00-meta.md" ] || continue; \
+		found=1; \
+		$(MAKE) pdf SRC="$$d" || exit 1; \
+	done; \
+	if [ "$$found" -eq 0 ]; then \
+		echo "pdf-all: docs/ にビルド対象がありません(docs/<name>.md または docs/<name>/ を置くと自動でビルド対象になります)"; \
+		exit 0; \
+	fi
 
 # DOCKER_TAG はイメージ構築対象の内容ハッシュなので、そのタグのイメージが
 # 既に存在するなら同じ Dockerfile 内容で構築済みであり、再構築は不要。
